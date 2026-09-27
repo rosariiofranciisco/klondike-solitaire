@@ -170,25 +170,6 @@ The game supports the following types of moves:
 - Tableau → Foundation
 - Foundation → Tableau
 
-All moves must be validated by the game engine.
-
-The graphical user interface must not directly modify the game state or implement game rules.
-
-The game engine is responsible for:
-
-- Validating moves
-- Updating the game state
-- Moving cards between piles
-- Revealing hidden cards
-- Detecting the win condition
-
-This separation allows the same game engine to be used by:
-
-- The graphical interface
-- The algorithmic bot
-- The AI/LLM bot
-- Automated tests
-
 ### Winning the Game
 
 The game is won when all 52 cards have been placed in the four Foundation piles.
