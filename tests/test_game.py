@@ -308,3 +308,120 @@ def test_move_tableau_to_foundation_rejects_wrong_rank():
     assert result is False
     assert game.foundations[0].peek() == ace
     assert game.tableau[0].peek() == three
+
+def test_move_tableau_to_tableau_moves_single_card():
+    game = KlondikeGame()
+
+    nine_hearts = Card(Suit.HEARTS, Rank.NINE, True)
+    ten_clubs = Card(Suit.CLUBS, Rank.TEN, True)
+
+    game.tableau[0].add(nine_hearts)
+    game.tableau[1].add(ten_clubs)
+
+    result = game.move_tableau_to_tableau(0, 0, 1)
+
+    assert result is True
+    assert game.tableau[0].is_empty()
+    assert game.tableau[1].peek() == nine_hearts
+
+def test_move_tableau_to_tableau_moves_sequence():
+    game = KlondikeGame()
+
+    queen_spades = Card(Suit.SPADES, Rank.QUEEN, True)
+    jack_hearts = Card(Suit.HEARTS, Rank.JACK, True)
+    ten_clubs = Card(Suit.CLUBS, Rank.TEN, True)
+    king_diamonds = Card(Suit.DIAMONDS, Rank.KING, True)
+
+    game.tableau[0].add(queen_spades)
+    game.tableau[0].add(jack_hearts)
+    game.tableau[0].add(ten_clubs)
+    game.tableau[1].add(king_diamonds)
+
+    result = game.move_tableau_to_tableau(0, 0, 1)
+
+    assert result is True
+    assert game.tableau[0].is_empty()
+    assert game.tableau[1].cards == [
+        king_diamonds,
+        queen_spades,
+        jack_hearts,
+        ten_clubs,
+    ]
+
+def test_move_tableau_to_tableau_reveals_new_top_card():
+    game = KlondikeGame()
+
+    hidden_card = Card(Suit.SPADES, Rank.KING)
+    queen_hearts = Card(Suit.HEARTS, Rank.QUEEN, True)
+    jack_clubs = Card(Suit.CLUBS, Rank.JACK, True)
+    king_spades = Card(Suit.SPADES, Rank.KING, True)
+
+    game.tableau[0].add(hidden_card)
+    game.tableau[0].add(queen_hearts)
+    game.tableau[0].add(jack_clubs)
+    game.tableau[1].add(king_spades)
+
+    result = game.move_tableau_to_tableau(0, 1, 1)
+
+    assert result is True
+    assert game.tableau[0].peek() == hidden_card
+    assert hidden_card.face_up is True
+
+def test_move_tableau_to_tableau_rejects_same_color():
+    game = KlondikeGame()
+
+    nine_hearts = Card(Suit.HEARTS, Rank.NINE, True)
+    ten_diamonds = Card(Suit.DIAMONDS, Rank.TEN, True)
+
+    game.tableau[0].add(nine_hearts)
+    game.tableau[1].add(ten_diamonds)
+
+    result = game.move_tableau_to_tableau(0, 0, 1)
+
+    assert result is False
+    assert game.tableau[0].peek() == nine_hearts
+    assert game.tableau[1].peek() == ten_diamonds
+
+
+def test_move_tableau_to_tableau_rejects_wrong_rank():
+    game = KlondikeGame()
+
+    eight_hearts = Card(Suit.HEARTS, Rank.EIGHT, True)
+    ten_clubs = Card(Suit.CLUBS, Rank.TEN, True)
+
+    game.tableau[0].add(eight_hearts)
+    game.tableau[1].add(ten_clubs)
+
+    result = game.move_tableau_to_tableau(0, 0, 1)
+
+    assert result is False
+    assert game.tableau[0].peek() == eight_hearts
+    assert game.tableau[1].peek() == ten_clubs
+
+
+def test_move_tableau_to_empty_tableau_accepts_king():
+    game = KlondikeGame()
+
+    king_hearts = Card(Suit.HEARTS, Rank.KING, True)
+
+    game.tableau[0].add(king_hearts)
+
+    result = game.move_tableau_to_tableau(0, 0, 1)
+
+    assert result is True
+    assert game.tableau[0].is_empty()
+    assert game.tableau[1].peek() == king_hearts
+
+
+def test_move_tableau_to_empty_tableau_rejects_non_king():
+    game = KlondikeGame()
+
+    queen_hearts = Card(Suit.HEARTS, Rank.QUEEN, True)
+
+    game.tableau[0].add(queen_hearts)
+
+    result = game.move_tableau_to_tableau(0, 0, 1)
+
+    assert result is False
+    assert game.tableau[0].peek() == queen_hearts
+    assert game.tableau[1].is_empty()

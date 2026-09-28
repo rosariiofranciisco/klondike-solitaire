@@ -1,6 +1,6 @@
 """Klondike game model."""
 
-from klondike.card import Rank
+from klondike.card import Rank, Suit
 from klondike.deck import Deck
 from klondike.foundation import FoundationPile
 from klondike.stock import StockPile
@@ -104,5 +104,55 @@ class KlondikeGame:
 
         foundation.add(tableau.remove())
         tableau.reveal_top()
+
+        return True
+
+    def move_tableau_to_tableau(
+        self,
+        source_index: int,
+        card_index: int,
+        target_index: int,
+    ) -> bool:
+        """Move a valid tableau sequence to another tableau."""
+        if not 0 <= source_index < len(self.tableau):
+            return False
+
+        if not 0 <= target_index < len(self.tableau):
+            return False
+
+        if source_index == target_index:
+            return False
+
+        source = self.tableau[source_index]
+        target = self.tableau[target_index]
+
+        if not source.can_move_sequence(card_index):
+            return False
+
+        moving_cards = source.cards[card_index:]
+        first_card = moving_cards[0]
+
+        if target.is_empty():
+            if first_card.rank != Rank.KING:
+                return False
+        else:
+            target_card = target.peek()
+
+            if target_card.rank != first_card.rank + 1:
+                return False
+
+            target_is_red = target_card.suit in (Suit.HEARTS, Suit.DIAMONDS)
+            first_is_red = first_card.suit in (Suit.HEARTS, Suit.DIAMONDS)
+
+            if target_is_red == first_is_red:
+                return False
+
+        moving_cards = source.cards[card_index:]
+
+        for card in moving_cards:
+            target.add(card)
+
+        del source.cards[card_index:]
+        source.reveal_top()
 
         return True
