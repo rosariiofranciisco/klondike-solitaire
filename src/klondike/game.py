@@ -1,5 +1,6 @@
 """Klondike game model."""
 
+from klondike.card import Rank
 from klondike.deck import Deck
 from klondike.foundation import FoundationPile
 from klondike.stock import StockPile
@@ -67,4 +68,41 @@ class KlondikeGame:
                 return False
 
         foundation.add(self.waste.remove())
+        return True
+
+    def move_tableau_to_foundation(
+        self,
+        tableau_index: int,
+        foundation_index: int,
+    ) -> bool:
+        """Move the top tableau card to a foundation if valid."""
+        if not 0 <= tableau_index < len(self.tableau):
+            return False
+
+        if not 0 <= foundation_index < len(self.foundations):
+            return False
+
+        tableau = self.tableau[tableau_index]
+
+        if tableau.is_empty():
+            return False
+
+        card = tableau.peek()
+        foundation = self.foundations[foundation_index]
+
+        if foundation.is_empty():
+            if card.rank != Rank.ACE:
+                return False
+        else:
+            top_card = foundation.peek()
+
+            if card.suit != top_card.suit:
+                return False
+
+            if card.rank != top_card.rank + 1:
+                return False
+
+        foundation.add(tableau.remove())
+        tableau.reveal_top()
+
         return True

@@ -218,3 +218,93 @@ def test_move_waste_to_foundation_rejects_wrong_rank():
     assert result is False
     assert game.foundations[0].peek() == ace
     assert game.waste.peek() == three
+
+def test_move_tableau_to_foundation_accepts_ace():
+    game = KlondikeGame()
+
+    ace = Card(Suit.HEARTS, Rank.ACE, True)
+    game.tableau[0].add(ace)
+
+    result = game.move_tableau_to_foundation(0, 0)
+
+    assert result is True
+    assert game.tableau[0].is_empty()
+    assert game.foundations[0].peek() == ace
+
+
+def test_move_tableau_to_foundation_reveals_new_top_card():
+    game = KlondikeGame()
+
+    hidden_card = Card(Suit.SPADES, Rank.KING)
+    ace = Card(Suit.HEARTS, Rank.ACE, True)
+
+    game.tableau[0].add(hidden_card)
+    game.tableau[0].add(ace)
+
+    result = game.move_tableau_to_foundation(0, 0)
+
+    assert result is True
+    assert game.foundations[0].peek() == ace
+    assert game.tableau[0].peek() == hidden_card
+    assert hidden_card.face_up is True
+
+
+def test_move_tableau_to_foundation_rejects_non_ace_on_empty_foundation():
+    game = KlondikeGame()
+
+    two = Card(Suit.HEARTS, Rank.TWO, True)
+    game.tableau[0].add(two)
+
+    result = game.move_tableau_to_foundation(0, 0)
+
+    assert result is False
+    assert game.tableau[0].peek() == two
+    assert game.foundations[0].is_empty()
+
+
+def test_move_tableau_to_foundation_accepts_next_card_of_same_suit():
+    game = KlondikeGame()
+
+    ace = Card(Suit.HEARTS, Rank.ACE, True)
+    two = Card(Suit.HEARTS, Rank.TWO, True)
+
+    game.foundations[0].add(ace)
+    game.tableau[0].add(two)
+
+    result = game.move_tableau_to_foundation(0, 0)
+
+    assert result is True
+    assert game.foundations[0].peek() == two
+    assert game.tableau[0].is_empty()
+
+
+def test_move_tableau_to_foundation_rejects_wrong_suit():
+    game = KlondikeGame()
+
+    ace = Card(Suit.HEARTS, Rank.ACE, True)
+    two = Card(Suit.SPADES, Rank.TWO, True)
+
+    game.foundations[0].add(ace)
+    game.tableau[0].add(two)
+
+    result = game.move_tableau_to_foundation(0, 0)
+
+    assert result is False
+    assert game.foundations[0].peek() == ace
+    assert game.tableau[0].peek() == two
+
+
+def test_move_tableau_to_foundation_rejects_wrong_rank():
+    game = KlondikeGame()
+
+    ace = Card(Suit.HEARTS, Rank.ACE, True)
+    three = Card(Suit.HEARTS, Rank.THREE, True)
+
+    game.foundations[0].add(ace)
+    game.tableau[0].add(three)
+
+    result = game.move_tableau_to_foundation(0, 0)
+
+    assert result is False
+    assert game.foundations[0].peek() == ace
+    assert game.tableau[0].peek() == three
