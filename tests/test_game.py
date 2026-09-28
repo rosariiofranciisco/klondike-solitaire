@@ -46,3 +46,64 @@ def test_new_game_has_empty_foundation_piles():
     game = KlondikeGame()
 
     assert all(pile.is_empty() for pile in game.foundations)
+
+def test_start_new_game_deals_correct_number_of_cards():
+    game = KlondikeGame()
+
+    game.start_new_game()
+
+    assert [len(pile) for pile in game.tableau] == [1, 2, 3, 4, 5, 6, 7]
+    assert len(game.stock) == 24
+    assert len(game.waste) == 0
+    assert all(len(pile) == 0 for pile in game.foundations)
+
+
+def test_start_new_game_has_52_cards_in_total():
+    game = KlondikeGame()
+
+    game.start_new_game()
+
+    tableau_cards = sum(len(pile) for pile in game.tableau)
+    foundation_cards = sum(len(pile) for pile in game.foundations)
+
+    total_cards = (
+        tableau_cards
+        + len(game.stock)
+        + len(game.waste)
+        + foundation_cards
+    )
+
+    assert total_cards == 52
+
+
+def test_start_new_game_reveals_only_top_tableau_cards():
+    game = KlondikeGame()
+
+    game.start_new_game()
+
+    for pile in game.tableau:
+        assert pile.peek().face_up is True
+
+        for card in pile.cards[:-1]:
+            assert card.face_up is False
+
+def test_start_new_game_has_all_52_unique_cards():
+    game = KlondikeGame()
+
+    game.start_new_game()
+
+    cards = []
+
+    for pile in game.tableau:
+        cards.extend(pile.cards)
+
+    cards.extend(game.stock.cards)
+    cards.extend(game.waste.cards)
+
+    for pile in game.foundations:
+        cards.extend(pile.cards)
+
+    card_combinations = {(card.suit, card.rank) for card in cards}
+
+    assert len(cards) == 52
+    assert len(card_combinations) == 52

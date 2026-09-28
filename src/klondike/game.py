@@ -1,5 +1,6 @@
 """Klondike game model."""
 
+from klondike.deck import Deck
 from klondike.foundation import FoundationPile
 from klondike.stock import StockPile
 from klondike.tableau import TableauPile
@@ -18,3 +19,17 @@ class KlondikeGame:
         ]
         self.stock = StockPile()
         self.waste = WastePile()
+
+    def start_new_game(self) -> None:
+        """Create and deal a new Klondike game."""
+        deck = Deck()
+        deck.shuffle()
+
+        for tableau_index in range(7):
+            for _ in range(tableau_index + 1):
+                self.tableau[tableau_index].add(deck.draw())
+
+            self.tableau[tableau_index].reveal_top()
+
+        while len(deck) > 0:
+            self.stock.add(deck.draw())
