@@ -33,3 +33,12 @@ class KlondikeGame:
 
         while len(deck) > 0:
             self.stock.add(deck.draw())
+
+    def draw_from_stock(self) -> None:
+        """Move one card from the stock to the waste."""
+        if self.stock.is_empty():
+            return
+
+        card = self.stock.remove()
+        card.face_up = True
+        self.waste.add(card) 

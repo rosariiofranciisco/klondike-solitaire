@@ -107,3 +107,33 @@ def test_start_new_game_has_all_52_unique_cards():
 
     assert len(cards) == 52
     assert len(card_combinations) == 52
+
+def test_draw_from_stock_moves_one_card_to_waste():
+    game = KlondikeGame()
+    game.start_new_game()
+
+    game.draw_from_stock()
+
+    assert len(game.stock) == 23
+    assert len(game.waste) == 1
+    assert game.waste.peek().face_up is True
+
+
+def test_draw_from_stock_moves_the_top_stock_card():
+    game = KlondikeGame()
+    game.start_new_game()
+
+    stock_top_card = game.stock.peek()
+
+    game.draw_from_stock()
+
+    assert game.waste.peek() == stock_top_card
+
+
+def test_draw_from_empty_stock_does_nothing():
+    game = KlondikeGame()
+
+    game.draw_from_stock()
+
+    assert game.stock.is_empty()
+    assert game.waste.is_empty()
