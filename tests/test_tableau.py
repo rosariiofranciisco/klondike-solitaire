@@ -55,3 +55,76 @@ def test_reveal_top_on_empty_tableau_does_nothing():
     tableau.reveal_top()
 
     assert tableau.is_empty()
+
+def test_can_move_sequence_accepts_valid_sequence():
+    tableau = TableauPile()
+
+    nine_hearts = Card(Suit.HEARTS, Rank.NINE, True)
+    eight_clubs = Card(Suit.CLUBS, Rank.EIGHT, True)
+    seven_hearts = Card(Suit.HEARTS, Rank.SEVEN, True)
+
+    tableau.add(nine_hearts)
+    tableau.add(eight_clubs)
+    tableau.add(seven_hearts)
+
+    assert tableau.can_move_sequence(0) is True
+
+
+def test_can_move_sequence_accepts_sequence_starting_in_middle():
+    tableau = TableauPile()
+
+    king_spades = Card(Suit.SPADES, Rank.KING, True)
+    queen_hearts = Card(Suit.HEARTS, Rank.QUEEN, True)
+    jack_clubs = Card(Suit.CLUBS, Rank.JACK, True)
+
+    tableau.add(king_spades)
+    tableau.add(queen_hearts)
+    tableau.add(jack_clubs)
+
+    assert tableau.can_move_sequence(1) is True
+
+
+def test_can_move_sequence_rejects_same_color():
+    tableau = TableauPile()
+
+    nine_hearts = Card(Suit.HEARTS, Rank.NINE, True)
+    eight_diamonds = Card(Suit.DIAMONDS, Rank.EIGHT, True)
+
+    tableau.add(nine_hearts)
+    tableau.add(eight_diamonds)
+
+    assert tableau.can_move_sequence(0) is False
+
+
+def test_can_move_sequence_rejects_wrong_rank():
+    tableau = TableauPile()
+
+    nine_hearts = Card(Suit.HEARTS, Rank.NINE, True)
+    seven_clubs = Card(Suit.CLUBS, Rank.SEVEN, True)
+
+    tableau.add(nine_hearts)
+    tableau.add(seven_clubs)
+
+    assert tableau.can_move_sequence(0) is False
+
+
+def test_can_move_sequence_rejects_face_down_card():
+    tableau = TableauPile()
+
+    nine_hearts = Card(Suit.HEARTS, Rank.NINE)
+    eight_clubs = Card(Suit.CLUBS, Rank.EIGHT, True)
+
+    tableau.add(nine_hearts)
+    tableau.add(eight_clubs)
+
+    assert tableau.can_move_sequence(0) is False
+
+
+def test_can_move_sequence_rejects_invalid_index():
+    tableau = TableauPile()
+
+    card = Card(Suit.HEARTS, Rank.ACE, True)
+    tableau.add(card)
+
+    assert tableau.can_move_sequence(-1) is False
+    assert tableau.can_move_sequence(1) is False
