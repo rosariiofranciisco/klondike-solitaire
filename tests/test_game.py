@@ -1,3 +1,4 @@
+from klondike.card import Card, Rank, Suit
 from klondike.foundation import FoundationPile
 from klondike.game import KlondikeGame
 from klondike.stock import StockPile
@@ -137,3 +138,83 @@ def test_draw_from_empty_stock_does_nothing():
 
     assert game.stock.is_empty()
     assert game.waste.is_empty()
+
+def test_move_waste_to_foundation_accepts_ace():
+    game = KlondikeGame()
+    game.start_new_game()
+
+    ace = next(
+        card
+        for pile in game.tableau
+        for card in pile.cards
+        if card.rank == 1
+    )
+
+    game.waste.add(ace)
+
+    result = game.move_waste_to_foundation(0)
+
+    assert result is True
+    assert len(game.waste) == 0
+    assert len(game.foundations[0]) == 1
+    assert game.foundations[0].peek() == ace
+
+def test_move_waste_to_foundation_rejects_non_ace_on_empty_foundation():
+    game = KlondikeGame()
+
+    card = Card(Suit.HEARTS, Rank.TWO)
+    card.face_up = True
+    game.waste.add(card)
+
+    result = game.move_waste_to_foundation(0)
+
+    assert result is False
+    assert len(game.waste) == 1
+    assert game.foundations[0].is_empty()
+
+def test_move_waste_to_foundation_accepts_next_card_of_same_suit():
+    game = KlondikeGame()
+
+    ace = Card(Suit.HEARTS, Rank.ACE, True)
+    two = Card(Suit.HEARTS, Rank.TWO, True)
+
+    game.foundations[0].add(ace)
+    game.waste.add(two)
+
+    result = game.move_waste_to_foundation(0)
+
+    assert result is True
+    assert game.foundations[0].peek() == two
+    assert game.waste.is_empty()
+
+
+def test_move_waste_to_foundation_rejects_wrong_suit():
+    game = KlondikeGame()
+
+    ace = Card(Suit.HEARTS, Rank.ACE, True)
+    two = Card(Suit.SPADES, Rank.TWO, True)
+
+    game.foundations[0].add(ace)
+    game.waste.add(two)
+
+    result = game.move_waste_to_foundation(0)
+
+    assert result is False
+    assert game.foundations[0].peek() == ace
+    assert game.waste.peek() == two
+
+
+def test_move_waste_to_foundation_rejects_wrong_rank():
+    game = KlondikeGame()
+
+    ace = Card(Suit.HEARTS, Rank.ACE, True)
+    three = Card(Suit.HEARTS, Rank.THREE, True)
+
+    game.foundations[0].add(ace)
+    game.waste.add(three)
+
+    result = game.move_waste_to_foundation(0)
+
+    assert result is False
+    assert game.foundations[0].peek() == ace
+    assert game.waste.peek() == three

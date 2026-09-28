@@ -42,3 +42,29 @@ class KlondikeGame:
         card = self.stock.remove()
         card.face_up = True
         self.waste.add(card) 
+
+    def move_waste_to_foundation(self, foundation_index: int) -> bool:
+        """Move the top waste card to a foundation if the move is valid."""
+        if self.waste.is_empty():
+            return False
+
+        if not 0 <= foundation_index < len(self.foundations):
+            return False
+
+        card = self.waste.peek()
+        foundation = self.foundations[foundation_index]
+
+        if foundation.is_empty():
+            if card.rank != 1:
+                return False
+        else:
+            top_card = foundation.peek()
+
+            if card.suit != top_card.suit:
+                return False
+
+            if card.rank != top_card.rank + 1:
+                return False
+
+        foundation.add(self.waste.remove())
+        return True
