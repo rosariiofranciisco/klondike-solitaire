@@ -156,3 +156,33 @@ class KlondikeGame:
         source.reveal_top()
 
         return True
+
+    def move_waste_to_tableau(self, tableau_index: int) -> bool:
+        """Move the top waste card to a tableau if valid."""
+        if not 0 <= tableau_index < len(self.tableau):
+            return False
+
+        if self.waste.is_empty():
+            return False
+
+        tableau = self.tableau[tableau_index]
+        card = self.waste.peek()
+
+        if tableau.is_empty():
+            if card.rank != Rank.KING:
+                return False
+        else:
+            top_card = tableau.peek()
+
+            if top_card.rank != card.rank + 1:
+                return False
+
+            top_is_red = top_card.suit in (Suit.HEARTS, Suit.DIAMONDS)
+            card_is_red = card.suit in (Suit.HEARTS, Suit.DIAMONDS)
+
+            if top_is_red == card_is_red:
+                return False
+
+        tableau.add(self.waste.remove())
+
+        return True        

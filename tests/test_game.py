@@ -425,3 +425,84 @@ def test_move_tableau_to_empty_tableau_rejects_non_king():
     assert result is False
     assert game.tableau[0].peek() == queen_hearts
     assert game.tableau[1].is_empty()
+
+def test_move_waste_to_tableau_moves_card():
+    game = KlondikeGame()
+
+    ten_clubs = Card(Suit.CLUBS, Rank.TEN, True)
+    nine_hearts = Card(Suit.HEARTS, Rank.NINE, True)
+
+    game.tableau[0].add(ten_clubs)
+    game.waste.add(nine_hearts)
+
+    result = game.move_waste_to_tableau(0)
+
+    assert result is True
+    assert game.waste.is_empty()
+    assert game.tableau[0].peek() == nine_hearts
+
+def test_move_waste_to_empty_tableau_accepts_king():
+    game = KlondikeGame()
+
+    king_hearts = Card(Suit.HEARTS, Rank.KING, True)
+    game.waste.add(king_hearts)
+
+    result = game.move_waste_to_tableau(0)
+
+    assert result is True
+    assert game.waste.is_empty()
+    assert game.tableau[0].peek() == king_hearts
+
+def test_move_waste_to_empty_tableau_rejects_non_king():
+    game = KlondikeGame()
+
+    queen_hearts = Card(Suit.HEARTS, Rank.QUEEN, True)
+    game.waste.add(queen_hearts)
+
+    result = game.move_waste_to_tableau(0)
+
+    assert result is False
+    assert game.waste.peek() == queen_hearts
+    assert game.tableau[0].is_empty()
+
+def test_move_waste_to_tableau_rejects_same_color():
+    game = KlondikeGame()
+
+    ten_hearts = Card(Suit.HEARTS, Rank.TEN, True)
+    nine_diamonds = Card(Suit.DIAMONDS, Rank.NINE, True)
+
+    game.tableau[0].add(ten_hearts)
+    game.waste.add(nine_diamonds)
+
+    result = game.move_waste_to_tableau(0)
+
+    assert result is False
+    assert game.tableau[0].peek() == ten_hearts
+    assert game.waste.peek() == nine_diamonds
+
+
+def test_move_waste_to_tableau_rejects_wrong_rank():
+    game = KlondikeGame()
+
+    ten_clubs = Card(Suit.CLUBS, Rank.TEN, True)
+    eight_hearts = Card(Suit.HEARTS, Rank.EIGHT, True)
+
+    game.tableau[0].add(ten_clubs)
+    game.waste.add(eight_hearts)
+
+    result = game.move_waste_to_tableau(0)
+
+    assert result is False
+    assert game.tableau[0].peek() == ten_clubs
+    assert game.waste.peek() == eight_hearts
+
+def test_move_waste_to_tableau_rejects_invalid_index():
+    game = KlondikeGame()
+
+    king_hearts = Card(Suit.HEARTS, Rank.KING, True)
+    game.waste.add(king_hearts)
+
+    assert game.move_waste_to_tableau(-1) is False
+    assert game.move_waste_to_tableau(7) is False
+
+    assert game.waste.peek() == king_hearts
