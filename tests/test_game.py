@@ -506,3 +506,101 @@ def test_move_waste_to_tableau_rejects_invalid_index():
     assert game.move_waste_to_tableau(7) is False
 
     assert game.waste.peek() == king_hearts
+
+def test_move_foundation_to_tableau_moves_valid_card():
+    game = KlondikeGame()
+
+    card = Card(Suit.HEARTS, Rank.QUEEN, True)
+    foundation_card = Card(Suit.CLUBS, Rank.JACK, True)
+
+    game.foundations[0].add(foundation_card)
+    game.tableau[0].add(card)
+
+    result = game.move_foundation_to_tableau(0, 0)
+
+    assert result is True
+    assert game.foundations[0].is_empty()
+    assert game.tableau[0].peek() == foundation_card
+
+
+def test_move_foundation_to_empty_tableau_accepts_king():
+    game = KlondikeGame()
+
+    card = Card(Suit.SPADES, Rank.KING, True)
+    game.foundations[0].add(card)
+
+    result = game.move_foundation_to_tableau(0, 0)
+
+    assert result is True
+    assert game.foundations[0].is_empty()
+    assert game.tableau[0].peek() == card
+
+
+def test_move_foundation_to_empty_tableau_rejects_non_king():
+    game = KlondikeGame()
+
+    card = Card(Suit.SPADES, Rank.QUEEN, True)
+    game.foundations[0].add(card)
+
+    result = game.move_foundation_to_tableau(0, 0)
+
+    assert result is False
+    assert game.foundations[0].peek() == card
+    assert game.tableau[0].is_empty()
+
+
+def test_move_foundation_to_tableau_rejects_same_color():
+    game = KlondikeGame()
+
+    foundation_card = Card(Suit.HEARTS, Rank.QUEEN, True)
+    tableau_card = Card(Suit.DIAMONDS, Rank.KING, True)
+
+    game.foundations[0].add(foundation_card)
+    game.tableau[0].add(tableau_card)
+
+    result = game.move_foundation_to_tableau(0, 0)
+
+    assert result is False
+    assert game.foundations[0].peek() == foundation_card
+    assert game.tableau[0].peek() == tableau_card
+
+
+def test_move_foundation_to_tableau_rejects_wrong_rank():
+    game = KlondikeGame()
+
+    foundation_card = Card(Suit.HEARTS, Rank.QUEEN, True)
+    tableau_card = Card(Suit.CLUBS, Rank.JACK, True)
+
+    game.foundations[0].add(foundation_card)
+    game.tableau[0].add(tableau_card)
+
+    result = game.move_foundation_to_tableau(0, 0)
+
+    assert result is False
+    assert game.foundations[0].peek() == foundation_card
+    assert game.tableau[0].peek() == tableau_card
+
+
+def test_move_foundation_to_tableau_rejects_empty_foundation():
+    game = KlondikeGame()
+
+    result = game.move_foundation_to_tableau(0, 0)
+
+    assert result is False
+    assert game.tableau[0].is_empty()
+
+
+def test_move_foundation_to_tableau_rejects_invalid_foundation_index():
+    game = KlondikeGame()
+
+    result = game.move_foundation_to_tableau(4, 0)
+
+    assert result is False
+
+
+def test_move_foundation_to_tableau_rejects_invalid_tableau_index():
+    game = KlondikeGame()
+
+    result = game.move_foundation_to_tableau(0, 7)
+
+    assert result is False
