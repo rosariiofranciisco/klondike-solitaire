@@ -604,3 +604,41 @@ def test_move_foundation_to_tableau_rejects_invalid_tableau_index():
     result = game.move_foundation_to_tableau(0, 7)
 
     assert result is False
+
+def test_recycle_waste_to_stock_moves_all_cards():
+    game = KlondikeGame()
+
+    first_card = Card(Suit.HEARTS, Rank.ACE, True)
+    second_card = Card(Suit.CLUBS, Rank.TWO, True)
+    third_card = Card(Suit.SPADES, Rank.THREE, True)
+
+    game.waste.add(first_card)
+    game.waste.add(second_card)
+    game.waste.add(third_card)
+
+    game.recycle_waste_to_stock()
+
+    assert game.waste.is_empty()
+    assert len(game.stock) == 3
+    assert game.stock.peek() == first_card
+
+def test_recycle_waste_to_stock_turns_cards_face_down():
+    game = KlondikeGame()
+
+    first_card = Card(Suit.HEARTS, Rank.ACE, True)
+    second_card = Card(Suit.CLUBS, Rank.TWO, True)
+
+    game.waste.add(first_card)
+    game.waste.add(second_card)
+
+    game.recycle_waste_to_stock()
+
+    assert all(not card.face_up for card in game.stock.cards)
+
+def test_recycle_empty_waste_does_nothing():
+    game = KlondikeGame()
+
+    game.recycle_waste_to_stock()
+
+    assert game.waste.is_empty()
+    assert game.stock.is_empty()

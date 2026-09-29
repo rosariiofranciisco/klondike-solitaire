@@ -44,6 +44,13 @@ class KlondikeGame:
         card.face_up = True
         self.waste.add(card) 
 
+    def recycle_waste_to_stock(self) -> None:
+        """Move all waste cards back to the stock."""
+        while not self.waste.is_empty():
+            card = self.waste.remove()
+            card.face_up = False
+            self.stock.add(card)
+
     def move_waste_to_foundation(self, foundation_index: int) -> bool:
         """Move the top waste card to a foundation if the move is valid."""
         if self.waste.is_empty():
