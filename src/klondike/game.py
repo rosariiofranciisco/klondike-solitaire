@@ -232,3 +232,7 @@ class KlondikeGame:
         tableau.add(foundation.remove())
 
         return True        
+
+    def is_won(self) -> bool:
+        """Return whether all cards have been moved to the foundations."""
+        return sum(len(foundation) for foundation in self.foundations) == 52

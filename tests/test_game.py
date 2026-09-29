@@ -642,3 +642,32 @@ def test_recycle_empty_waste_does_nothing():
 
     assert game.waste.is_empty()
     assert game.stock.is_empty()
+
+def test_is_won_returns_false_for_new_game():
+    game = KlondikeGame()
+
+    assert game.is_won() is False
+
+
+def test_is_won_returns_false_when_foundations_are_not_complete():
+    game = KlondikeGame()
+
+    for foundation in game.foundations:
+        for rank in range(1, 13):
+            foundation.add(Card(Suit.HEARTS, Rank(rank), True))
+
+    assert game.is_won() is False
+
+
+def test_is_won_returns_true_when_all_52_cards_are_in_foundations():
+    game = KlondikeGame()
+
+    for foundation, suit in zip(
+        game.foundations,
+        Suit,
+        strict=False,
+    ):
+        for rank in Rank:
+            foundation.add(Card(suit, rank, True))
+
+    assert game.is_won() is True
