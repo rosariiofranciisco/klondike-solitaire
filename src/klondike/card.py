@@ -12,6 +12,8 @@ class Suit(Enum):
     CLUBS = "♣"
     SPADES = "♠"
 
+RED_SUITS = {Suit.HEARTS, Suit.DIAMONDS}
+BLACK_SUITS = {Suit.CLUBS, Suit.SPADES}
 
 class Rank(IntEnum):
     """The thirteen ranks in a standard deck."""

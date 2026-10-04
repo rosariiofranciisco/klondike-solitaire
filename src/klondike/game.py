@@ -1,6 +1,6 @@
 """Klondike game model."""
 
-from klondike.card import Rank, Suit
+from klondike.card import RED_SUITS, Rank
 from klondike.deck import Deck
 from klondike.foundation import FoundationPile
 from klondike.stock import StockPile
@@ -51,38 +51,43 @@ class KlondikeGame:
             card.face_up = False
             self.stock.add(card)
 
-    def move_waste_to_foundation(self, foundation_index: int) -> bool:
-        """Move the top waste card to a foundation if the move is valid."""
-        if self.waste.is_empty():
+    def can_move_waste_to_foundation(self, foundation_index: int) -> bool:
+        """Return whether the top waste card can move to a foundation."""
+        if not 0 <= foundation_index < len(self.foundations):
             return False
 
-        if not 0 <= foundation_index < len(self.foundations):
+        if self.waste.is_empty():
             return False
 
         card = self.waste.peek()
         foundation = self.foundations[foundation_index]
 
         if foundation.is_empty():
-            if card.rank != 1:
-                return False
-        else:
-            top_card = foundation.peek()
+            return card.rank == Rank.ACE
 
-            if card.suit != top_card.suit:
-                return False
+        top_card = foundation.peek()
 
-            if card.rank != top_card.rank + 1:
-                return False
+        return (
+            card.suit == top_card.suit
+            and card.rank == top_card.rank + 1
+        )
+
+    def move_waste_to_foundation(self, foundation_index: int) -> bool:
+        """Move the top waste card to a foundation if the move is valid."""
+        if not self.can_move_waste_to_foundation(foundation_index):
+            return False
+
+        foundation = self.foundations[foundation_index]
 
         foundation.add(self.waste.remove())
         return True
 
-    def move_tableau_to_foundation(
+    def can_move_tableau_to_foundation(
         self,
         tableau_index: int,
         foundation_index: int,
     ) -> bool:
-        """Move the top tableau card to a foundation if valid."""
+        """Return whether the top tableau card can move to a foundation."""
         if not 0 <= tableau_index < len(self.tableau):
             return False
 
@@ -98,29 +103,42 @@ class KlondikeGame:
         foundation = self.foundations[foundation_index]
 
         if foundation.is_empty():
-            if card.rank != Rank.ACE:
-                return False
-        else:
-            top_card = foundation.peek()
+            return card.rank == Rank.ACE
 
-            if card.suit != top_card.suit:
-                return False
+        top_card = foundation.peek()
 
-            if card.rank != top_card.rank + 1:
-                return False
+        return (
+            card.suit == top_card.suit
+            and card.rank == top_card.rank + 1
+        )
+
+    def move_tableau_to_foundation(
+        self,
+        tableau_index: int,
+        foundation_index: int,
+    ) -> bool:
+        """Move the top tableau card to a foundation if valid."""
+        if not self.can_move_tableau_to_foundation(
+            tableau_index,
+            foundation_index,
+        ):
+            return False
+
+        tableau = self.tableau[tableau_index]
+        foundation = self.foundations[foundation_index]
 
         foundation.add(tableau.remove())
         tableau.reveal_top()
 
         return True
 
-    def move_tableau_to_tableau(
+    def can_move_tableau_to_tableau(
         self,
         source_index: int,
         card_index: int,
         target_index: int,
     ) -> bool:
-        """Move a valid tableau sequence to another tableau."""
+        """Return whether a tableau sequence can move to another tableau."""
         if not 0 <= source_index < len(self.tableau):
             return False
 
@@ -136,23 +154,37 @@ class KlondikeGame:
         if not source.can_move_sequence(card_index):
             return False
 
-        moving_cards = source.cards[card_index:]
-        first_card = moving_cards[0]
+        first_card = source.cards[card_index]
 
         if target.is_empty():
-            if first_card.rank != Rank.KING:
-                return False
-        else:
-            target_card = target.peek()
+            return first_card.rank == Rank.KING
 
-            if target_card.rank != first_card.rank + 1:
-                return False
+        target_card = target.peek()
 
-            target_is_red = target_card.suit in (Suit.HEARTS, Suit.DIAMONDS)
-            first_is_red = first_card.suit in (Suit.HEARTS, Suit.DIAMONDS)
+        if target_card.rank != first_card.rank + 1:
+            return False
 
-            if target_is_red == first_is_red:
-                return False
+        target_is_red = target_card.suit in RED_SUITS
+        first_is_red = first_card.suit in RED_SUITS
+
+        return target_is_red != first_is_red
+
+    def move_tableau_to_tableau(
+        self,
+        source_index: int,
+        card_index: int,
+        target_index: int,
+    ) -> bool:
+        """Move a valid tableau sequence to another tableau."""
+        if not self.can_move_tableau_to_tableau(
+            source_index,
+            card_index,
+            target_index,
+        ):
+            return False
+
+        source = self.tableau[source_index]
+        target = self.tableau[target_index]
 
         moving_cards = source.cards[card_index:]
 
@@ -164,8 +196,8 @@ class KlondikeGame:
 
         return True
 
-    def move_waste_to_tableau(self, tableau_index: int) -> bool:
-        """Move the top waste card to a tableau if valid."""
+    def can_move_waste_to_tableau(self, tableau_index: int) -> bool:
+        """Return whether the top waste card can move to a tableau."""
         if not 0 <= tableau_index < len(self.tableau):
             return False
 
@@ -176,30 +208,34 @@ class KlondikeGame:
         card = self.waste.peek()
 
         if tableau.is_empty():
-            if card.rank != Rank.KING:
-                return False
-        else:
-            top_card = tableau.peek()
+            return card.rank == Rank.KING
 
-            if top_card.rank != card.rank + 1:
-                return False
+        top_card = tableau.peek()
 
-            top_is_red = top_card.suit in (Suit.HEARTS, Suit.DIAMONDS)
-            card_is_red = card.suit in (Suit.HEARTS, Suit.DIAMONDS)
+        if top_card.rank != card.rank + 1:
+            return False
 
-            if top_is_red == card_is_red:
-                return False
+        top_is_red = top_card.suit in RED_SUITS
+        card_is_red = card.suit in RED_SUITS
 
+        return top_is_red != card_is_red
+
+    def move_waste_to_tableau(self, tableau_index: int) -> bool:
+        """Move the top waste card to a tableau if valid."""
+        if not self.can_move_waste_to_tableau(tableau_index):
+            return False
+
+        tableau = self.tableau[tableau_index]
         tableau.add(self.waste.remove())
 
         return True
 
-    def move_foundation_to_tableau(
+    def can_move_foundation_to_tableau(
         self,
         foundation_index: int,
         tableau_index: int,
     ) -> bool:
-        """Move the top foundation card to a tableau if valid."""
+        """Return whether the top foundation card can move to a tableau."""
         if not 0 <= foundation_index < len(self.foundations):
             return False
 
@@ -207,32 +243,86 @@ class KlondikeGame:
             return False
 
         foundation = self.foundations[foundation_index]
-        tableau = self.tableau[tableau_index]
 
         if foundation.is_empty():
             return False
 
+        tableau = self.tableau[tableau_index]
         card = foundation.peek()
 
         if tableau.is_empty():
-            if card.rank != Rank.KING:
-                return False
-        else:
-            top_card = tableau.peek()
+            return card.rank == Rank.KING
 
-            if top_card.rank != card.rank + 1:
-                return False
+        top_card = tableau.peek()
 
-            top_is_red = top_card.suit in (Suit.HEARTS, Suit.DIAMONDS)
-            card_is_red = card.suit in (Suit.HEARTS, Suit.DIAMONDS)
+        if top_card.rank != card.rank + 1:
+            return False
 
-            if top_is_red == card_is_red:
-                return False
+        top_is_red = top_card.suit in RED_SUITS
+        card_is_red = card.suit in RED_SUITS
+
+        return top_is_red != card_is_red
+
+    def move_foundation_to_tableau(
+        self,
+        foundation_index: int,
+        tableau_index: int,
+    ) -> bool:
+        """Move the top foundation card to a tableau if valid."""
+        if not self.can_move_foundation_to_tableau(
+            foundation_index,
+            tableau_index,
+        ):
+            return False
+
+        foundation = self.foundations[foundation_index]
+        tableau = self.tableau[tableau_index]
 
         tableau.add(foundation.remove())
 
-        return True        
+        return True       
 
     def is_won(self) -> bool:
         """Return whether all cards have been moved to the foundations."""
         return sum(len(foundation) for foundation in self.foundations) == 52
+
+    def is_game_over(self) -> bool:
+        """Return whether the game has ended without a win."""
+        if self.is_won():
+            return True
+
+        if not self.stock.is_empty():
+            return False
+
+        if not self.waste.is_empty():
+            return False
+
+        for tableau_index in range(len(self.tableau)):
+            for foundation_index in range(len(self.foundations)):
+                if self.can_move_tableau_to_foundation(
+                    tableau_index,
+                    foundation_index,
+                ):
+                    return False
+
+        for source_index in range(len(self.tableau)):
+            source = self.tableau[source_index]
+
+            for card_index in range(len(source)):
+                for target_index in range(len(self.tableau)):
+                    if self.can_move_tableau_to_tableau(
+                        source_index,
+                        card_index,
+                        target_index,
+                    ):
+                        return False
+
+        for foundation_index in range(len(self.foundations)):
+            for tableau_index in range(len(self.tableau)):
+                if self.can_move_foundation_to_tableau(
+                    foundation_index,
+                    tableau_index,
+                ):
+                    return False
+
+        return True

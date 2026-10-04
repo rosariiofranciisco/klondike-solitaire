@@ -1,5 +1,6 @@
 """Tableau pile model for Klondike Solitaire."""
 
+from klondike.card import RED_SUITS
 from klondike.pile import Pile
 
 
@@ -23,19 +24,16 @@ class TableauPile(Pile):
         if not all(card.face_up for card in sequence):
             return False
 
-        for current, next_card in zip(sequence, sequence[1:], strict=False):
+        for current, next_card in zip(
+            sequence,
+            sequence[1:],
+            strict=False,
+        ):
             if current.rank != next_card.rank + 1:
                 return False
 
-            if current.suit.value in "♥♦":
-                current_is_red = True
-            else:
-                current_is_red = False
-
-            if next_card.suit.value in "♥♦":
-                next_is_red = True
-            else:
-                next_is_red = False
+            current_is_red = current.suit in RED_SUITS
+            next_is_red = next_card.suit in RED_SUITS
 
             if current_is_red == next_is_red:
                 return False

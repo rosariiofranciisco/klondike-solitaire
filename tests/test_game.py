@@ -141,15 +141,8 @@ def test_draw_from_empty_stock_does_nothing():
 
 def test_move_waste_to_foundation_accepts_ace():
     game = KlondikeGame()
-    game.start_new_game()
 
-    ace = next(
-        card
-        for pile in game.tableau
-        for card in pile.cards
-        if card.rank == 1
-    )
-
+    ace = Card(Suit.HEARTS, Rank.ACE, True)
     game.waste.add(ace)
 
     result = game.move_waste_to_foundation(0)
@@ -671,3 +664,296 @@ def test_is_won_returns_true_when_all_52_cards_are_in_foundations():
             foundation.add(Card(suit, rank, True))
 
     assert game.is_won() is True
+
+def test_can_move_waste_to_foundation_returns_true_for_valid_move():
+    game = KlondikeGame()
+
+    foundation_card = Card(Suit.HEARTS, Rank.FOUR, True)
+    waste_card = Card(Suit.HEARTS, Rank.FIVE, True)
+
+    game.foundations[0].add(foundation_card)
+    game.waste.add(waste_card)
+
+    assert game.can_move_waste_to_foundation(0) is True
+
+
+def test_can_move_waste_to_foundation_does_not_change_game():
+    game = KlondikeGame()
+
+    foundation_card = Card(Suit.HEARTS, Rank.FOUR, True)
+    waste_card = Card(Suit.HEARTS, Rank.FIVE, True)
+
+    game.foundations[0].add(foundation_card)
+    game.waste.add(waste_card)
+
+    result = game.can_move_waste_to_foundation(0)
+
+    assert result is True
+    assert game.foundations[0].peek() == foundation_card
+    assert game.waste.peek() == waste_card
+
+
+def test_can_move_waste_to_foundation_rejects_invalid_move():
+    game = KlondikeGame()
+
+    foundation_card = Card(Suit.HEARTS, Rank.FOUR, True)
+    waste_card = Card(Suit.CLUBS, Rank.SIX, True)
+
+    game.foundations[0].add(foundation_card)
+    game.waste.add(waste_card)
+
+    assert game.can_move_waste_to_foundation(0) is False
+
+def test_can_move_waste_to_tableau_returns_true_for_valid_move():
+    game = KlondikeGame()
+
+    tableau_card = Card(Suit.HEARTS, Rank.QUEEN, True)
+    waste_card = Card(Suit.CLUBS, Rank.JACK, True)
+
+    game.tableau[0].add(tableau_card)
+    game.waste.add(waste_card)
+
+    assert game.can_move_waste_to_tableau(0) is True
+
+
+def test_can_move_waste_to_tableau_does_not_change_game():
+    game = KlondikeGame()
+
+    tableau_card = Card(Suit.HEARTS, Rank.QUEEN, True)
+    waste_card = Card(Suit.CLUBS, Rank.JACK, True)
+
+    game.tableau[0].add(tableau_card)
+    game.waste.add(waste_card)
+
+    result = game.can_move_waste_to_tableau(0)
+
+    assert result is True
+    assert game.tableau[0].peek() == tableau_card
+    assert game.waste.peek() == waste_card
+
+
+def test_can_move_waste_to_tableau_rejects_invalid_move():
+    game = KlondikeGame()
+
+    tableau_card = Card(Suit.HEARTS, Rank.QUEEN, True)
+    waste_card = Card(Suit.DIAMONDS, Rank.JACK, True)
+
+    game.tableau[0].add(tableau_card)
+    game.waste.add(waste_card)
+
+    assert game.can_move_waste_to_tableau(0) is False
+
+def test_can_move_tableau_to_foundation_returns_true_for_valid_move():
+    game = KlondikeGame()
+
+    tableau_card = Card(Suit.HEARTS, Rank.FIVE, True)
+    foundation_card = Card(Suit.HEARTS, Rank.FOUR, True)
+
+    game.tableau[0].add(tableau_card)
+    game.foundations[0].add(foundation_card)
+
+    assert game.can_move_tableau_to_foundation(0, 0) is True
+
+
+def test_can_move_tableau_to_foundation_does_not_change_game():
+    game = KlondikeGame()
+
+    tableau_card = Card(Suit.HEARTS, Rank.FIVE, True)
+    foundation_card = Card(Suit.HEARTS, Rank.FOUR, True)
+
+    game.tableau[0].add(tableau_card)
+    game.foundations[0].add(foundation_card)
+
+    result = game.can_move_tableau_to_foundation(0, 0)
+
+    assert result is True
+    assert game.tableau[0].peek() == tableau_card
+    assert game.foundations[0].peek() == foundation_card
+
+
+def test_can_move_tableau_to_foundation_accepts_ace_on_empty_foundation():
+    game = KlondikeGame()
+
+    ace = Card(Suit.SPADES, Rank.ACE, True)
+    game.tableau[0].add(ace)
+
+    assert game.can_move_tableau_to_foundation(0, 0) is True
+
+
+def test_can_move_tableau_to_foundation_rejects_invalid_move():
+    game = KlondikeGame()
+
+    tableau_card = Card(Suit.HEARTS, Rank.FIVE, True)
+    foundation_card = Card(Suit.CLUBS, Rank.FOUR, True)
+
+    game.tableau[0].add(tableau_card)
+    game.foundations[0].add(foundation_card)
+
+    assert game.can_move_tableau_to_foundation(0, 0) is False
+
+def test_can_move_foundation_to_tableau_returns_true_for_valid_move():
+    game = KlondikeGame()
+
+    foundation_card = Card(Suit.CLUBS, Rank.JACK, True)
+    tableau_card = Card(Suit.HEARTS, Rank.QUEEN, True)
+
+    game.foundations[0].add(foundation_card)
+    game.tableau[0].add(tableau_card)
+
+    assert game.can_move_foundation_to_tableau(0, 0) is True
+
+
+def test_can_move_foundation_to_tableau_does_not_change_game():
+    game = KlondikeGame()
+
+    foundation_card = Card(Suit.CLUBS, Rank.JACK, True)
+    tableau_card = Card(Suit.HEARTS, Rank.QUEEN, True)
+
+    game.foundations[0].add(foundation_card)
+    game.tableau[0].add(tableau_card)
+
+    result = game.can_move_foundation_to_tableau(0, 0)
+
+    assert result is True
+    assert game.foundations[0].peek() == foundation_card
+    assert game.tableau[0].peek() == tableau_card
+
+
+def test_can_move_foundation_to_empty_tableau_accepts_king():
+    game = KlondikeGame()
+
+    king = Card(Suit.SPADES, Rank.KING, True)
+    game.foundations[0].add(king)
+
+    assert game.can_move_foundation_to_tableau(0, 0) is True
+
+
+def test_can_move_foundation_to_empty_tableau_rejects_non_king():
+    game = KlondikeGame()
+
+    card = Card(Suit.SPADES, Rank.QUEEN, True)
+    game.foundations[0].add(card)
+
+    assert game.can_move_foundation_to_tableau(0, 0) is False
+
+
+def test_can_move_foundation_to_tableau_rejects_invalid_move():
+    game = KlondikeGame()
+
+    foundation_card = Card(Suit.HEARTS, Rank.JACK, True)
+    tableau_card = Card(Suit.DIAMONDS, Rank.QUEEN, True)
+
+    game.foundations[0].add(foundation_card)
+    game.tableau[0].add(tableau_card)
+
+    assert game.can_move_foundation_to_tableau(0, 0) is False
+
+
+def test_can_move_foundation_to_tableau_rejects_empty_foundation():
+    game = KlondikeGame()
+
+    assert game.can_move_foundation_to_tableau(0, 0) is False
+
+def test_can_move_tableau_to_tableau_returns_true_for_valid_sequence():
+    game = KlondikeGame()
+
+    source = game.tableau[0]
+    target = game.tableau[1]
+
+    source.add(Card(Suit.HEARTS, Rank.NINE, True))
+    source.add(Card(Suit.CLUBS, Rank.EIGHT, True))
+    source.add(Card(Suit.HEARTS, Rank.SEVEN, True))
+
+    target.add(Card(Suit.CLUBS, Rank.TEN, True))
+
+    assert game.can_move_tableau_to_tableau(0, 0, 1) is True
+
+
+def test_can_move_tableau_to_tableau_does_not_change_game():
+    game = KlondikeGame()
+
+    source = game.tableau[0]
+    target = game.tableau[1]
+
+    first_card = Card(Suit.HEARTS, Rank.NINE, True)
+    second_card = Card(Suit.CLUBS, Rank.EIGHT, True)
+    target_card = Card(Suit.CLUBS, Rank.TEN, True)
+
+    source.add(first_card)
+    source.add(second_card)
+    target.add(target_card)
+
+    result = game.can_move_tableau_to_tableau(0, 0, 1)
+
+    assert result is True
+    assert source.cards == [first_card, second_card]
+    assert target.peek() == target_card
+
+
+def test_can_move_tableau_to_empty_tableau_requires_king():
+    game = KlondikeGame()
+
+    game.tableau[0].add(Card(Suit.SPADES, Rank.KING, True))
+
+    assert game.can_move_tableau_to_tableau(0, 0, 1) is True
+
+
+def test_can_move_tableau_to_empty_tableau_rejects_non_king():
+    game = KlondikeGame()
+
+    game.tableau[0].add(Card(Suit.SPADES, Rank.QUEEN, True))
+
+    assert game.can_move_tableau_to_tableau(0, 0, 1) is False
+
+
+def test_can_move_tableau_to_tableau_rejects_invalid_sequence():
+    game = KlondikeGame()
+
+    game.tableau[0].add(Card(Suit.HEARTS, Rank.NINE, True))
+    game.tableau[0].add(Card(Suit.DIAMONDS, Rank.EIGHT, True))
+
+    game.tableau[1].add(Card(Suit.CLUBS, Rank.TEN, True))
+
+    assert game.can_move_tableau_to_tableau(0, 0, 1) is False
+
+
+def test_can_move_tableau_to_tableau_rejects_invalid_target():
+    game = KlondikeGame()
+
+    game.tableau[0].add(Card(Suit.HEARTS, Rank.NINE, True))
+    game.tableau[1].add(Card(Suit.DIAMONDS, Rank.TEN, True))
+
+    assert game.can_move_tableau_to_tableau(0, 0, 1) is False
+
+def test_game_is_not_over_when_stock_has_cards():
+    game = KlondikeGame()
+
+    game.stock.add(Card(Suit.HEARTS, Rank.ACE))
+
+    assert game.is_game_over() is False
+
+
+def test_game_is_not_over_when_waste_has_cards():
+    game = KlondikeGame()
+
+    game.waste.add(Card(Suit.HEARTS, Rank.ACE, True))
+
+    assert game.is_game_over() is False
+
+
+def test_game_is_over_when_won():
+    game = KlondikeGame()
+
+    for suit in Suit:
+        foundation = game.foundations[list(Suit).index(suit)]
+
+        for rank in Rank:
+            foundation.add(Card(suit, rank, True))
+
+    assert game.is_game_over() is True
+
+
+def test_empty_game_is_game_over():
+    game = KlondikeGame()
+
+    assert game.is_game_over() is True
