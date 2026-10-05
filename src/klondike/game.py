@@ -3,6 +3,7 @@
 from klondike.card import RED_SUITS, Rank
 from klondike.deck import Deck
 from klondike.foundation import FoundationPile
+from klondike.move import Move, MoveType
 from klondike.stock import StockPile
 from klondike.tableau import TableauPile
 from klondike.waste import WastePile
@@ -35,14 +36,16 @@ class KlondikeGame:
         while len(deck) > 0:
             self.stock.add(deck.draw())
 
-    def draw_from_stock(self) -> None:
-        """Move one card from the stock to the waste."""
+    def draw_from_stock(self) -> bool:
+        """Move one card from the stock to the waste if possible."""
         if self.stock.is_empty():
-            return
+            return False
 
         card = self.stock.remove()
         card.face_up = True
-        self.waste.add(card) 
+        self.waste.add(card)
+
+        return True
 
     def recycle_waste_to_stock(self) -> None:
         """Move all waste cards back to the stock."""
@@ -326,3 +329,54 @@ class KlondikeGame:
                     return False
 
         return True
+
+    def execute_move(self, move: Move) -> bool:
+        """Execute a move if it is valid."""
+        if move.move_type == MoveType.STOCK_TO_WASTE:
+            return self.draw_from_stock()
+
+        if move.move_type == MoveType.WASTE_TO_FOUNDATION:
+            if move.target_index is None:
+                return False
+
+            return self.move_waste_to_foundation(move.target_index)
+
+        if move.move_type == MoveType.WASTE_TO_TABLEAU:
+            if move.target_index is None:
+                return False
+
+            return self.move_waste_to_tableau(move.target_index)
+
+        if move.move_type == MoveType.TABLEAU_TO_FOUNDATION:
+            if move.source_index is None or move.target_index is None:
+                return False
+
+            return self.move_tableau_to_foundation(
+                move.source_index,
+                move.target_index,
+            )
+
+        if move.move_type == MoveType.TABLEAU_TO_TABLEAU:
+            if (
+                move.source_index is None
+                or move.card_index is None
+                or move.target_index is None
+            ):
+                return False
+
+            return self.move_tableau_to_tableau(
+                move.source_index,
+                move.card_index,
+                move.target_index,
+            )
+
+        if move.move_type == MoveType.FOUNDATION_TO_TABLEAU:
+            if move.source_index is None or move.target_index is None:
+                return False
+
+            return self.move_foundation_to_tableau(
+                move.source_index,
+                move.target_index,
+            )
+
+        return False

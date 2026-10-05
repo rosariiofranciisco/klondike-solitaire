@@ -1,6 +1,7 @@
 from klondike.card import Card, Rank, Suit
 from klondike.foundation import FoundationPile
 from klondike.game import KlondikeGame
+from klondike.move import Move, MoveType
 from klondike.stock import StockPile
 from klondike.tableau import TableauPile
 from klondike.waste import WastePile
@@ -957,3 +958,130 @@ def test_empty_game_is_game_over():
     game = KlondikeGame()
 
     assert game.is_game_over() is True
+
+def test_execute_stock_to_waste():
+    game = KlondikeGame()
+
+    card = Card(Suit.HEARTS, Rank.ACE)
+    game.stock.add(card)
+
+    result = game.execute_move(
+        Move(MoveType.STOCK_TO_WASTE)
+    )
+
+    assert result is True
+    assert len(game.stock) == 0
+    assert len(game.waste) == 1
+    assert game.waste.peek() == card
+    assert card.face_up is True
+
+
+def test_execute_waste_to_foundation():
+    game = KlondikeGame()
+
+    card = Card(Suit.HEARTS, Rank.ACE, True)
+    game.waste.add(card)
+
+    result = game.execute_move(
+        Move(
+            MoveType.WASTE_TO_FOUNDATION,
+            target_index=0,
+        )
+    )
+
+    assert result is True
+    assert len(game.waste) == 0
+    assert game.foundations[0].peek() == card
+
+
+def test_execute_waste_to_tableau():
+    game = KlondikeGame()
+
+    card = Card(Suit.SPADES, Rank.KING, True)
+    game.waste.add(card)
+
+    result = game.execute_move(
+        Move(
+            MoveType.WASTE_TO_TABLEAU,
+            target_index=0,
+        )
+    )
+
+    assert result is True
+    assert len(game.waste) == 0
+    assert game.tableau[0].peek() == card
+
+
+def test_execute_tableau_to_foundation():
+    game = KlondikeGame()
+
+    card = Card(Suit.HEARTS, Rank.ACE, True)
+    game.tableau[0].add(card)
+
+    result = game.execute_move(
+        Move(
+            MoveType.TABLEAU_TO_FOUNDATION,
+            source_index=0,
+            target_index=0,
+        )
+    )
+
+    assert result is True
+    assert len(game.tableau[0]) == 0
+    assert game.foundations[0].peek() == card
+
+
+def test_execute_tableau_to_tableau():
+    game = KlondikeGame()
+
+    moving_card = Card(Suit.HEARTS, Rank.NINE, True)
+    target_card = Card(Suit.CLUBS, Rank.TEN, True)
+
+    game.tableau[0].add(moving_card)
+    game.tableau[1].add(target_card)
+
+    result = game.execute_move(
+        Move(
+            MoveType.TABLEAU_TO_TABLEAU,
+            source_index=0,
+            card_index=0,
+            target_index=1,
+        )
+    )
+
+    assert result is True
+    assert len(game.tableau[0]) == 0
+    assert game.tableau[1].peek() == moving_card
+
+
+def test_execute_foundation_to_tableau():
+    game = KlondikeGame()
+
+    foundation_card = Card(Suit.HEARTS, Rank.KING, True)
+    game.foundations[0].add(foundation_card)
+
+    result = game.execute_move(
+        Move(
+            MoveType.FOUNDATION_TO_TABLEAU,
+            source_index=0,
+            target_index=0,
+        )
+    )
+
+    assert result is True
+    assert len(game.foundations[0]) == 0
+    assert game.tableau[0].peek() == foundation_card
+
+def test_execute_stock_to_waste_returns_false_when_stock_is_empty():
+    game = KlondikeGame()
+
+    result = game.execute_move(
+        Move(MoveType.STOCK_TO_WASTE)
+    )
+
+    assert result is False
+
+def test_draw_from_stock_returns_false_when_stock_is_empty():
+    game = KlondikeGame()
+
+    assert game.draw_from_stock() is False
