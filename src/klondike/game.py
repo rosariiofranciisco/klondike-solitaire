@@ -1,9 +1,12 @@
 """Klondike game model."""
 
+from copy import deepcopy
+
 from klondike.card import RED_SUITS, Rank
 from klondike.deck import Deck
 from klondike.foundation import FoundationPile
 from klondike.move import Move, MoveType
+from klondike.state import GameState
 from klondike.stock import StockPile
 from klondike.tableau import TableauPile
 from klondike.waste import WastePile
@@ -21,6 +24,39 @@ class KlondikeGame:
         ]
         self.stock = StockPile()
         self.waste = WastePile()
+        self.history: list[GameState] = []
+
+    def _create_snapshot(self) -> GameState:
+        """Create an independent snapshot of the current game state."""
+        return GameState(
+            tableau=deepcopy(
+                [pile.cards for pile in self.tableau]
+            ),
+            foundations=deepcopy(
+                [pile.cards for pile in self.foundations]
+            ),
+            stock=deepcopy(self.stock.cards),
+            waste=deepcopy(self.waste.cards),
+        )
+
+    def _restore_snapshot(self, state: GameState) -> None:
+        """Restore the game state from a snapshot."""
+        for pile, cards in zip(
+            self.tableau,
+            state.tableau,
+            strict=False,
+        ):
+            pile.cards = deepcopy(cards)
+
+        for pile, cards in zip(
+            self.foundations,
+            state.foundations,
+            strict=False,
+        ):
+            pile.cards = deepcopy(cards)
+
+        self.stock.cards = deepcopy(state.stock)
+        self.waste.cards = deepcopy(state.waste)
 
     def start_new_game(self) -> None:
         """Create and deal a new Klondike game."""
@@ -35,6 +71,8 @@ class KlondikeGame:
 
         while len(deck) > 0:
             self.stock.add(deck.draw())
+
+        self.history.clear()
 
     def draw_from_stock(self) -> bool:
         """Move one card from the stock to the waste if possible."""
@@ -331,32 +369,38 @@ class KlondikeGame:
         return True
 
     def execute_move(self, move: Move) -> bool:
-        """Execute a move if it is valid."""
+        """Execute a move if it is valid and record its previous state."""
+        snapshot = self._create_snapshot()
+
         if move.move_type == MoveType.STOCK_TO_WASTE:
-            return self.draw_from_stock()
+            result = self.draw_from_stock()
 
-        if move.move_type == MoveType.WASTE_TO_FOUNDATION:
+        elif move.move_type == MoveType.WASTE_TO_FOUNDATION:
             if move.target_index is None:
                 return False
 
-            return self.move_waste_to_foundation(move.target_index)
+            result = self.move_waste_to_foundation(
+                move.target_index,
+            )
 
-        if move.move_type == MoveType.WASTE_TO_TABLEAU:
+        elif move.move_type == MoveType.WASTE_TO_TABLEAU:
             if move.target_index is None:
                 return False
 
-            return self.move_waste_to_tableau(move.target_index)
+            result = self.move_waste_to_tableau(
+                move.target_index,
+            )
 
-        if move.move_type == MoveType.TABLEAU_TO_FOUNDATION:
+        elif move.move_type == MoveType.TABLEAU_TO_FOUNDATION:
             if move.source_index is None or move.target_index is None:
                 return False
 
-            return self.move_tableau_to_foundation(
+            result = self.move_tableau_to_foundation(
                 move.source_index,
                 move.target_index,
             )
 
-        if move.move_type == MoveType.TABLEAU_TO_TABLEAU:
+        elif move.move_type == MoveType.TABLEAU_TO_TABLEAU:
             if (
                 move.source_index is None
                 or move.card_index is None
@@ -364,19 +408,35 @@ class KlondikeGame:
             ):
                 return False
 
-            return self.move_tableau_to_tableau(
+            result = self.move_tableau_to_tableau(
                 move.source_index,
                 move.card_index,
                 move.target_index,
             )
 
-        if move.move_type == MoveType.FOUNDATION_TO_TABLEAU:
+        elif move.move_type == MoveType.FOUNDATION_TO_TABLEAU:
             if move.source_index is None or move.target_index is None:
                 return False
 
-            return self.move_foundation_to_tableau(
+            result = self.move_foundation_to_tableau(
                 move.source_index,
                 move.target_index,
             )
 
-        return False
+        else:
+            return False
+
+        if result:
+            self.history.append(snapshot)
+
+        return result
+
+    def undo(self) -> bool:
+        """Undo the most recent successful move."""
+        if not self.history:
+            return False
+
+        state = self.history.pop()
+        self._restore_snapshot(state)
+
+        return True

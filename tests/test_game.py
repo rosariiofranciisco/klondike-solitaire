@@ -1085,3 +1085,244 @@ def test_draw_from_stock_returns_false_when_stock_is_empty():
     game = KlondikeGame()
 
     assert game.draw_from_stock() is False
+
+def test_create_snapshot_is_independent():
+    game = KlondikeGame()
+    game.start_new_game()
+
+    state = game._create_snapshot()
+
+    original_face_up = state.tableau[0][0].face_up
+
+    game.tableau[0].peek().face_up = not original_face_up
+
+    assert state.tableau[0][0].face_up == original_face_up
+
+
+def test_restore_snapshot_restores_game_state():
+    game = KlondikeGame()
+    game.start_new_game()
+
+    state = game._create_snapshot()
+
+    original_tableau = [
+        pile.cards.copy() for pile in game.tableau
+    ]
+
+    game.tableau[0].cards.clear()
+    game._restore_snapshot(state)
+
+    assert game.tableau[0].cards == original_tableau[0]
+
+def test_execute_move_adds_snapshot_to_history():
+    game = KlondikeGame()
+    game.start_new_game()
+
+    move = Move(MoveType.STOCK_TO_WASTE)
+
+    assert len(game.history) == 0
+
+    result = game.execute_move(move)
+
+    assert result is True
+    assert len(game.history) == 1
+
+
+def test_execute_invalid_move_does_not_add_to_history():
+    game = KlondikeGame()
+
+    move = Move(
+        MoveType.WASTE_TO_FOUNDATION,
+        target_index=0,
+    )
+
+    result = game.execute_move(move)
+
+    assert result is False
+    assert len(game.history) == 0
+
+
+def test_start_new_game_clears_history():
+    game = KlondikeGame()
+    game.start_new_game()
+
+    game.execute_move(
+        Move(MoveType.STOCK_TO_WASTE),
+    )
+
+    assert len(game.history) == 1
+
+    game.start_new_game()
+
+    assert len(game.history) == 0
+
+def test_undo_returns_false_when_history_is_empty():
+    game = KlondikeGame()
+
+    assert game.undo() is False
+
+def test_undo_restores_previous_state():
+    game = KlondikeGame()
+    game.start_new_game()
+
+    initial_state = game._create_snapshot()
+
+    result = game.execute_move(
+        Move(MoveType.STOCK_TO_WASTE),
+    )
+
+    assert result is True
+    assert len(game.history) == 1
+    assert len(game.stock) == 23
+    assert len(game.waste) == 1
+
+    result = game.undo()
+
+    assert result is True
+    assert len(game.history) == 0
+
+    restored_state = game._create_snapshot()
+
+    assert restored_state == initial_state
+
+def test_undo_can_reverse_multiple_moves():
+    game = KlondikeGame()
+    game.start_new_game()
+
+    initial_state = game._create_snapshot()
+
+    game.execute_move(Move(MoveType.STOCK_TO_WASTE))
+    game.execute_move(Move(MoveType.STOCK_TO_WASTE))
+
+    assert len(game.stock) == 22
+    assert len(game.waste) == 2
+    assert len(game.history) == 2
+
+    assert game.undo() is True
+
+    assert len(game.stock) == 23
+    assert len(game.waste) == 1
+    assert len(game.history) == 1
+
+    assert game.undo() is True
+
+    assert len(game.stock) == 24
+    assert len(game.waste) == 0
+    assert len(game.history) == 0
+
+    restored_state = game._create_snapshot()
+
+    assert restored_state == initial_state
+
+def test_undo_waste_to_foundation():
+    game = KlondikeGame()
+
+    card = Card(Suit.HEARTS, Rank.ACE, True)
+    game.waste.add(card)
+
+    initial_state = game._create_snapshot()
+
+    assert game.execute_move(
+        Move(
+            MoveType.WASTE_TO_FOUNDATION,
+            target_index=0,
+        )
+    )
+
+    assert len(game.waste) == 0
+    assert len(game.foundations[0]) == 1
+
+    assert game.undo() is True
+    assert game._create_snapshot() == initial_state
+
+
+def test_undo_waste_to_tableau():
+    game = KlondikeGame()
+
+    card = Card(Suit.HEARTS, Rank.KING, True)
+    game.waste.add(card)
+
+    initial_state = game._create_snapshot()
+
+    assert game.execute_move(
+        Move(
+            MoveType.WASTE_TO_TABLEAU,
+            target_index=0,
+        )
+    )
+
+    assert len(game.waste) == 0
+    assert len(game.tableau[0]) == 1
+
+    assert game.undo() is True
+    assert game._create_snapshot() == initial_state
+
+
+def test_undo_tableau_to_foundation():
+    game = KlondikeGame()
+
+    card = Card(Suit.HEARTS, Rank.ACE, True)
+    game.tableau[0].add(card)
+
+    initial_state = game._create_snapshot()
+
+    assert game.execute_move(
+        Move(
+            MoveType.TABLEAU_TO_FOUNDATION,
+            source_index=0,
+            target_index=0,
+        )
+    )
+
+    assert len(game.tableau[0]) == 0
+    assert len(game.foundations[0]) == 1
+
+    assert game.undo() is True
+    assert game._create_snapshot() == initial_state
+
+
+def test_undo_tableau_to_tableau():
+    game = KlondikeGame()
+
+    moving_card = Card(Suit.HEARTS, Rank.KING, True)
+    game.tableau[0].add(moving_card)
+
+    initial_state = game._create_snapshot()
+
+    assert game.execute_move(
+        Move(
+            MoveType.TABLEAU_TO_TABLEAU,
+            source_index=0,
+            card_index=0,
+            target_index=1,
+        )
+    )
+
+    assert len(game.tableau[0]) == 0
+    assert len(game.tableau[1]) == 1
+
+    assert game.undo() is True
+    assert game._create_snapshot() == initial_state
+
+
+def test_undo_foundation_to_tableau():
+    game = KlondikeGame()
+
+    card = Card(Suit.HEARTS, Rank.KING, True)
+    game.foundations[0].add(card)
+
+    initial_state = game._create_snapshot()
+
+    assert game.execute_move(
+        Move(
+            MoveType.FOUNDATION_TO_TABLEAU,
+            source_index=0,
+            target_index=0,
+        )
+    )
+
+    assert len(game.foundations[0]) == 0
+    assert len(game.tableau[0]) == 1
+
+    assert game.undo() is True
+    assert game._create_snapshot() == initial_state
