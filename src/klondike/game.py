@@ -375,6 +375,13 @@ class KlondikeGame:
         if move.move_type == MoveType.STOCK_TO_WASTE:
             result = self.draw_from_stock()
 
+        elif move.move_type == MoveType.RECYCLE_WASTE_TO_STOCK:
+            if self.stock.is_empty() and not self.waste.is_empty():
+                self.recycle_waste_to_stock()
+                result = True
+            else:
+                result = False
+
         elif move.move_type == MoveType.WASTE_TO_FOUNDATION:
             if move.target_index is None:
                 return False

@@ -8,6 +8,7 @@ class MoveType(Enum):
     """Represent the possible types of moves."""
 
     STOCK_TO_WASTE = "stock_to_waste"
+    RECYCLE_WASTE_TO_STOCK = "recycle_waste_to_stock"
     WASTE_TO_FOUNDATION = "waste_to_foundation"
     WASTE_TO_TABLEAU = "waste_to_tableau"
     TABLEAU_TO_FOUNDATION = "tableau_to_foundation"

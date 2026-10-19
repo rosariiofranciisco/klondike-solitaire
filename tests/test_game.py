@@ -1214,6 +1214,37 @@ def test_undo_can_reverse_multiple_moves():
 
     assert restored_state == initial_state
 
+def test_undo_recycle_waste_to_stock():
+    game = KlondikeGame()
+    game.stock.cards.clear()
+    game.waste.cards.clear()
+
+    first_card = Card(Suit.CLUBS, Rank.SEVEN)
+    second_card = Card(Suit.HEARTS, Rank.THREE)
+
+    first_card.face_up = True
+    second_card.face_up = True
+
+    game.waste.add(first_card)
+    game.waste.add(second_card)
+
+    assert game.execute_move(
+        Move(MoveType.RECYCLE_WASTE_TO_STOCK)
+    )
+
+    assert game.stock.cards == [second_card, first_card]
+    assert game.waste.is_empty()
+
+    assert game.undo()
+
+    assert game.stock.is_empty()
+    assert len(game.waste.cards) == 2
+    assert game.waste.cards[0].rank == Rank.SEVEN
+    assert game.waste.cards[0].suit == Suit.CLUBS
+    assert game.waste.cards[1].rank == Rank.THREE
+    assert game.waste.cards[1].suit == Suit.HEARTS
+    assert all(card.face_up for card in game.waste.cards)
+
 def test_undo_waste_to_foundation():
     game = KlondikeGame()
 

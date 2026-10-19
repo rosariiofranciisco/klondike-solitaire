@@ -2,7 +2,7 @@ from klondike.move import Move, MoveType
 
 
 def test_all_move_types_exist():
-    assert len(MoveType) == 6
+    assert len(MoveType) == 7
 
 
 def test_move_can_be_created_with_only_type():
