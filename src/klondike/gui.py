@@ -2,48 +2,48 @@
 
 import pygame
 
+from klondike.config import (
+    BACKGROUND_COLOR,
+    BLACK_CARD_COLOR,
+    CARD_BACK_COLOR,
+    CARD_BACK_INNER_COLOR,
+    CARD_BORDER_COLOR,
+    CARD_BORDER_WIDTH,
+    CARD_COLOR,
+    CARD_CORNER_RADIUS,
+    CARD_HEIGHT,
+    CARD_INNER_CORNER_RADIUS,
+    CARD_INNER_PADDING,
+    CARD_RANK_Y_OFFSET,
+    CARD_SLOT_GAP,
+    CARD_SUIT_Y_OFFSET,
+    CARD_TEXT_X_OFFSET,
+    CARD_WIDTH,
+    COLUMN_GAP,
+    EMPTY_SLOT_COLOR,
+    FONT_BOLD,
+    FONT_NAME,
+    FONT_SIZE,
+    FOUNDATION_COUNT,
+    FPS,
+    MARGIN_X,
+    RANK_LABELS,
+    RED_CARD_COLOR,
+    RED_SUITS,
+    SELECTION_BORDER_WIDTH,
+    SELECTION_COLOR,
+    SUIT_FONT_NAME,
+    SUIT_FONT_SIZE,
+    TABLEAU_CARD_OFFSET,
+    TABLEAU_Y,
+    TOP_ROW_Y,
+    WINDOW_HEIGHT,
+    WINDOW_TITLE,
+    WINDOW_WIDTH,
+)
 from klondike.game import KlondikeGame
 from klondike.move import Move, MoveType
 
-WINDOW_WIDTH = 900
-WINDOW_HEIGHT = 650
-
-CARD_WIDTH = 70
-CARD_HEIGHT = 100
-
-MARGIN_X = 40
-TOP_ROW_Y = 40
-TABLEAU_Y = 220
-
-COLUMN_GAP = 35
-CARD_SLOT_GAP = 20
-TABLEAU_CARD_OFFSET = 25
-
-BACKGROUND_COLOR = (30, 120, 70)
-CARD_COLOR = (250, 250, 250)
-CARD_BORDER_COLOR = (40, 40, 40)
-CARD_BACK_COLOR = (35, 65, 125)
-CARD_BACK_BORDER_COLOR = (230, 230, 230)
-CARD_BACK_INNER_COLOR = (100, 140, 200)
-EMPTY_SLOT_COLOR = (230, 230, 230)
-RED_CARD_COLOR = (200, 30, 45)
-BLACK_CARD_COLOR = (25, 25, 25)
-
-RANK_LABELS = {
-    1: "A",
-    2: "2",
-    3: "3",
-    4: "4",
-    5: "5",
-    6: "6",
-    7: "7",
-    8: "8",
-    9: "9",
-    10: "10",
-    11: "J",
-    12: "Q",
-    13: "K",
-}
 
 class KlondikeGUI:
     """Represent the graphical interface of the Klondike game."""
@@ -51,13 +51,20 @@ class KlondikeGUI:
     def __init__(self) -> None:
         pygame.init()
 
-        self.rank_font = pygame.font.SysFont("arial", 18, bold=True)
-        self.suit_font = pygame.font.SysFont("segoe ui symbol", 22)
+        self.rank_font = pygame.font.SysFont(
+            FONT_NAME,
+            FONT_SIZE,
+            bold=FONT_BOLD,
+        )
+        self.suit_font = pygame.font.SysFont(
+            SUIT_FONT_NAME,
+            SUIT_FONT_SIZE,
+        )
 
         self.screen = pygame.display.set_mode(
             (WINDOW_WIDTH, WINDOW_HEIGHT),
         )
-        pygame.display.set_caption("Klondike Solitaire")
+        pygame.display.set_caption(WINDOW_TITLE)
 
         self.clock = pygame.time.Clock()
         self.game = KlondikeGame()
@@ -74,7 +81,7 @@ class KlondikeGUI:
             self._draw()
 
             pygame.display.flip()
-            self.clock.tick(60)
+            self.clock.tick(FPS)
 
         pygame.quit()
 
@@ -131,17 +138,27 @@ class KlondikeGUI:
         foundation_start_x = (
             WINDOW_WIDTH
             - MARGIN_X
-            - (4 * CARD_WIDTH + 3 * CARD_SLOT_GAP)
+            - (
+                FOUNDATION_COUNT * CARD_WIDTH
+                + (FOUNDATION_COUNT - 1) * CARD_SLOT_GAP
+            )
         )
 
         if TOP_ROW_Y <= y <= TOP_ROW_Y + CARD_HEIGHT:
-            for index in range(len(self.game.foundations)):
+            for index, foundation in enumerate(self.game.foundations):
                 foundation_x = foundation_start_x + index * (
                     CARD_WIDTH + CARD_SLOT_GAP
                 )
 
                 if foundation_x <= x <= foundation_x + CARD_WIDTH:
-                    if self.selected_source is not None:
+                    if self.selected_source is None:
+                        if not foundation.is_empty():
+                            self.selected_source = (
+                                MoveType.FOUNDATION_TO_TABLEAU,
+                                index,
+                                None,
+                            )
+                    else:
                         source_type, source_index, card_index = (
                             self.selected_source
                         )
@@ -153,26 +170,28 @@ class KlondikeGUI:
                                     target_index=index,
                                 )
                             )
+                            self.selected_source = None
 
                         elif source_type == MoveType.TABLEAU_TO_TABLEAU:
                             self.game.execute_move(
                                 Move(
                                     move_type=MoveType.TABLEAU_TO_FOUNDATION,
                                     source_index=source_index,
-                                    card_index=card_index,
                                     target_index=index,
                                 )
                             )
+                            self.selected_source = None
 
-                    elif not self.game.waste.is_empty():
-                        self.game.execute_move(
-                            Move(
-                                move_type=MoveType.WASTE_TO_FOUNDATION,
-                                target_index=index,
-                            )
-                        )
+                        elif source_type == MoveType.FOUNDATION_TO_TABLEAU:
+                            if not foundation.is_empty():
+                                self.selected_source = (
+                                    MoveType.FOUNDATION_TO_TABLEAU,
+                                    index,
+                                    None,
+                                )
+                            else:
+                                self.selected_source = None
 
-                    self.selected_source = None
                     return
 
         if y < TABLEAU_Y:
@@ -206,7 +225,16 @@ class KlondikeGUI:
 
         source_type, source_index, card_index = self.selected_source
 
-        if source_type == MoveType.WASTE_TO_TABLEAU:
+        if source_type == MoveType.FOUNDATION_TO_TABLEAU:
+            self.game.execute_move(
+                Move(
+                    move_type=MoveType.FOUNDATION_TO_TABLEAU,
+                    source_index=source_index,
+                    target_index=column,
+                )
+            )
+
+        elif source_type == MoveType.WASTE_TO_TABLEAU:
             self.game.execute_move(
                 Move(
                     move_type=MoveType.WASTE_TO_TABLEAU,
@@ -240,25 +268,30 @@ class KlondikeGUI:
         """Draw a face-down card."""
         pygame.draw.rect(
             self.screen,
-            (35, 65, 125),
+            CARD_BACK_COLOR,
             (x, y, CARD_WIDTH, CARD_HEIGHT),
-            border_radius=5,
+            border_radius=CARD_CORNER_RADIUS,
         )
 
         pygame.draw.rect(
             self.screen,
-            (230, 230, 230),
+            EMPTY_SLOT_COLOR,
             (x, y, CARD_WIDTH, CARD_HEIGHT),
-            width=2,
-            border_radius=5,
+            width=CARD_BORDER_WIDTH,
+            border_radius=CARD_CORNER_RADIUS,
         )
 
         pygame.draw.rect(
             self.screen,
-            (100, 140, 200),
-            (x + 6, y + 6, CARD_WIDTH - 12, CARD_HEIGHT - 12),
-            width=2,
-            border_radius=3,
+            CARD_BACK_INNER_COLOR,
+            (
+                x + CARD_INNER_PADDING,
+                y + CARD_INNER_PADDING,
+                CARD_WIDTH - 2 * CARD_INNER_PADDING,
+                CARD_HEIGHT - 2 * CARD_INNER_PADDING,
+            ),
+            width=CARD_BORDER_WIDTH,
+            border_radius=CARD_INNER_CORNER_RADIUS,
         )
 
     def _draw_card(self, card, x: int, y: int) -> None:
@@ -267,21 +300,20 @@ class KlondikeGUI:
             self.screen,
             CARD_COLOR,
             (x, y, CARD_WIDTH, CARD_HEIGHT),
-            border_radius=5,
+            border_radius=CARD_CORNER_RADIUS,
         )
 
         pygame.draw.rect(
             self.screen,
             CARD_BORDER_COLOR,
             (x, y, CARD_WIDTH, CARD_HEIGHT),
-            width=2,
-            border_radius=5,
+            width=CARD_BORDER_WIDTH,
+            border_radius=CARD_CORNER_RADIUS,
         )
 
-        red_suits = {"♥", "♦"}
         color = (
             RED_CARD_COLOR
-            if card.suit.value in red_suits
+            if card.suit.value in RED_SUITS
             else BLACK_CARD_COLOR
         )
 
@@ -296,8 +328,14 @@ class KlondikeGUI:
             color,
         )
 
-        self.screen.blit(rank_text, (x + 6, y + 5))
-        self.screen.blit(suit_text, (x + 6, y + 27))
+        self.screen.blit(
+            rank_text,
+            (x + CARD_TEXT_X_OFFSET, y + CARD_RANK_Y_OFFSET),
+        )
+        self.screen.blit(
+            suit_text,
+            (x + CARD_TEXT_X_OFFSET, y + CARD_SUIT_Y_OFFSET),
+        )
 
     def _draw_top_row(self) -> None:
         """Draw the stock, waste, and foundation piles."""
@@ -307,10 +345,10 @@ class KlondikeGUI:
         if self.game.stock.is_empty():
             pygame.draw.rect(
                 self.screen,
-                (230, 230, 230),
+                EMPTY_SLOT_COLOR,
                 (stock_x, TOP_ROW_Y, CARD_WIDTH, CARD_HEIGHT),
-                width=2,
-                border_radius=5,
+                width=CARD_BORDER_WIDTH,
+                border_radius=CARD_CORNER_RADIUS,
             )
         else:
             self._draw_card_back(stock_x, TOP_ROW_Y)
@@ -324,10 +362,10 @@ class KlondikeGUI:
         else:
             pygame.draw.rect(
                 self.screen,
-                (230, 230, 230),
+                EMPTY_SLOT_COLOR,
                 (waste_x, TOP_ROW_Y, CARD_WIDTH, CARD_HEIGHT),
-                width=2,
-                border_radius=5,
+                width=CARD_BORDER_WIDTH,
+                border_radius=CARD_CORNER_RADIUS,
             )
 
         if (
@@ -337,7 +375,12 @@ class KlondikeGUI:
             self._draw_selection(waste_x, TOP_ROW_Y)
 
         foundation_start_x = (
-            WINDOW_WIDTH - MARGIN_X - (4 * CARD_WIDTH + 3 * 20)
+            WINDOW_WIDTH
+            - MARGIN_X
+            - (
+                FOUNDATION_COUNT * CARD_WIDTH
+                + (FOUNDATION_COUNT - 1) * CARD_SLOT_GAP
+            )
         )
 
         for foundation_index, foundation in enumerate(
@@ -350,10 +393,10 @@ class KlondikeGUI:
             if foundation.is_empty():
                 pygame.draw.rect(
                     self.screen,
-                    (230, 230, 230),
+                    EMPTY_SLOT_COLOR,
                     (x, TOP_ROW_Y, CARD_WIDTH, CARD_HEIGHT),
-                    width=2,
-                    border_radius=5,
+                    width=CARD_BORDER_WIDTH,
+                    border_radius=CARD_CORNER_RADIUS,
                 )
             else:
                 self._draw_card(
@@ -361,6 +404,14 @@ class KlondikeGUI:
                     x,
                     TOP_ROW_Y,
                 )
+
+            if (
+                self.selected_source is not None
+                and self.selected_source[0]
+                == MoveType.FOUNDATION_TO_TABLEAU
+                and self.selected_source[1] == foundation_index
+            ):
+                self._draw_selection(x, TOP_ROW_Y)
 
     def _draw_tableau(self) -> None:
         """Draw the seven tableau piles and their cards."""
@@ -372,10 +423,10 @@ class KlondikeGUI:
             if pile.is_empty():
                 pygame.draw.rect(
                     self.screen,
-                    (230, 230, 230),
+                    EMPTY_SLOT_COLOR,
                     (x, TABLEAU_Y, CARD_WIDTH, CARD_HEIGHT),
-                    width=2,
-                    border_radius=5,
+                    width=CARD_BORDER_WIDTH,
+                    border_radius=CARD_CORNER_RADIUS,
                 )
                 continue
 
@@ -400,10 +451,10 @@ class KlondikeGUI:
         """Draw a highlight around a selected card."""
         pygame.draw.rect(
             self.screen,
-            (255, 215, 0),
+            SELECTION_COLOR,
             (x, y, CARD_WIDTH, CARD_HEIGHT),
-            width=4,
-            border_radius=5,
+            width=SELECTION_BORDER_WIDTH,
+            border_radius=CARD_CORNER_RADIUS,
         )
 
 
