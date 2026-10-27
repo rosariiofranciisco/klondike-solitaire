@@ -168,3 +168,34 @@ def test_click_foundation_then_tableau_moves_card(gui):
     assert gui.game.foundations[0].is_empty()
     assert gui.game.tableau[1].cards == [target_card, moving_card]
     assert gui.selected_source is None
+
+
+def test_selected_tableau_card_is_highlighted(gui, monkeypatch):
+    for pile in gui.game.tableau:
+        pile.cards.clear()
+
+    first_card = Card(Suit.HEARTS, Rank.FIVE)
+    selected_card = Card(Suit.CLUBS, Rank.SIX, face_up=True)
+
+    gui.game.tableau[0].add(first_card)
+    gui.game.tableau[0].add(selected_card)
+
+    gui.selected_source = (
+        MoveType.TABLEAU_TO_TABLEAU,
+        0,
+        1,
+    )
+
+    highlighted_positions = []
+
+    monkeypatch.setattr(
+        gui,
+        "_draw_selection",
+        lambda x, y: highlighted_positions.append((x, y)),
+    )
+
+    gui._draw_tableau()
+
+    assert highlighted_positions == [
+        (MARGIN_X, TABLEAU_Y + TABLEAU_CARD_OFFSET)
+    ]
