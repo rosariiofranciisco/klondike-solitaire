@@ -233,3 +233,29 @@ def test_selected_foundation_is_highlighted(gui, monkeypatch):
     assert highlighted_positions == [
         (foundation_start_x, TOP_ROW_Y)
     ]
+
+def test_click_selected_tableau_card_cancels_selection(gui):
+    for pile in gui.game.tableau:
+        pile.cards.clear()
+
+    selected_card = Card(Suit.CLUBS, Rank.SIX, face_up=True)
+    gui.game.tableau[0].add(selected_card)
+
+    card_position = (
+        MARGIN_X + 10,
+        TABLEAU_Y + 10,
+    )
+
+    gui._handle_left_click(card_position)
+
+    assert gui.selected_source == (
+        MoveType.TABLEAU_TO_TABLEAU,
+        0,
+        0,
+    )
+
+    gui._handle_left_click(card_position)
+
+    assert gui.selected_source is None
+    assert gui.game.tableau[0].cards == [selected_card]
+
