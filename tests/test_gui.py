@@ -199,3 +199,37 @@ def test_selected_tableau_card_is_highlighted(gui, monkeypatch):
     assert highlighted_positions == [
         (MARGIN_X, TABLEAU_Y + TABLEAU_CARD_OFFSET)
     ]
+
+
+def test_selected_foundation_is_highlighted(gui, monkeypatch):
+    moving_card = Card(Suit.CLUBS, Rank.SIX, face_up=True)
+    gui.game.foundations[0].add(moving_card)
+
+    gui.selected_source = (
+        MoveType.FOUNDATION_TO_TABLEAU,
+        0,
+        None,
+    )
+
+    highlighted_positions = []
+
+    monkeypatch.setattr(
+        gui,
+        "_draw_selection",
+        lambda x, y: highlighted_positions.append((x, y)),
+    )
+
+    gui._draw_top_row()
+
+    foundation_start_x = (
+        WINDOW_WIDTH
+        - MARGIN_X
+        - (
+            FOUNDATION_COUNT * CARD_WIDTH
+            + (FOUNDATION_COUNT - 1) * CARD_SLOT_GAP
+        )
+    )
+
+    assert highlighted_positions == [
+        (foundation_start_x, TOP_ROW_Y)
+    ]
