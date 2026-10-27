@@ -8,6 +8,7 @@ from klondike.config import (
     CARD_SLOT_GAP,
     CARD_WIDTH,
     COLUMN_GAP,
+    FOUNDATION_COUNT,
     MARGIN_X,
     TABLEAU_CARD_OFFSET,
     TABLEAU_Y,
@@ -121,5 +122,49 @@ def test_click_tableau_moves_card_and_reveals_source_top(gui):
 
     assert gui.game.tableau[0].cards == [hidden_card]
     assert hidden_card.face_up
+    assert gui.game.tableau[1].cards == [target_card, moving_card]
+    assert gui.selected_source is None
+
+
+def test_click_foundation_then_tableau_moves_card(gui):
+    gui.game.stock.cards.clear()
+    gui.game.waste.cards.clear()
+
+    for pile in gui.game.tableau:
+        pile.cards.clear()
+
+    for foundation in gui.game.foundations:
+        foundation.cards.clear()
+
+    moving_card = Card(Suit.CLUBS, Rank.SIX, face_up=True)
+    target_card = Card(Suit.DIAMONDS, Rank.SEVEN, face_up=True)
+
+    gui.game.foundations[0].add(moving_card)
+    gui.game.tableau[1].add(target_card)
+
+    foundation_start_x = (
+        WINDOW_WIDTH
+        - MARGIN_X
+        - (
+            FOUNDATION_COUNT * CARD_WIDTH
+            + (FOUNDATION_COUNT - 1) * CARD_SLOT_GAP
+        )
+    )
+
+    foundation_x = foundation_start_x + 10
+    foundation_y = TOP_ROW_Y + 10
+
+    tableau_x = MARGIN_X + CARD_WIDTH + COLUMN_GAP + 10
+    tableau_y = TABLEAU_Y + 10
+
+    gui._handle_left_click((foundation_x, foundation_y))
+
+    assert gui.selected_source is not None
+    assert gui.selected_source[0] == MoveType.FOUNDATION_TO_TABLEAU
+    assert gui.selected_source[1] == 0
+
+    gui._handle_left_click((tableau_x, tableau_y))
+
+    assert gui.game.foundations[0].is_empty()
     assert gui.game.tableau[1].cards == [target_card, moving_card]
     assert gui.selected_source is None
