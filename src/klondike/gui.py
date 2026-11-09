@@ -26,10 +26,26 @@ from klondike.config import (
     FONT_SIZE,
     FOUNDATION_COUNT,
     FPS,
+    INVALID_MOVE_BLINK_INTERVAL,
+    INVALID_MOVE_BORDER_WIDTH,
+    INVALID_MOVE_COLOR,
+    INVALID_MOVE_FEEDBACK_DURATION,
     MARGIN_X,
+    NEW_GAME_BUTTON_COLOR,
+    NEW_GAME_BUTTON_HEIGHT,
+    NEW_GAME_BUTTON_HOVER_COLOR,
+    NEW_GAME_BUTTON_TEXT_COLOR,
+    NEW_GAME_BUTTON_WIDTH,
+    NEW_GAME_BUTTON_X,
+    NEW_GAME_BUTTON_Y,
     RANK_LABELS,
     RED_CARD_COLOR,
     RED_SUITS,
+    RESULT_FONT_SIZE,
+    RESULT_PANEL_COLOR,
+    RESULT_PANEL_HEIGHT,
+    RESULT_PANEL_WIDTH,
+    RESULT_TEXT_COLOR,
     SELECTION_BORDER_WIDTH,
     SELECTION_COLOR,
     SUIT_FONT_NAME,
@@ -37,6 +53,14 @@ from klondike.config import (
     TABLEAU_CARD_OFFSET,
     TABLEAU_Y,
     TOP_ROW_Y,
+    UNDO_BUTTON_COLOR,
+    UNDO_BUTTON_DISABLED_COLOR,
+    UNDO_BUTTON_HEIGHT,
+    UNDO_BUTTON_HOVER_COLOR,
+    UNDO_BUTTON_TEXT_COLOR,
+    UNDO_BUTTON_WIDTH,
+    UNDO_BUTTON_X,
+    UNDO_BUTTON_Y,
     WINDOW_HEIGHT,
     WINDOW_TITLE,
     WINDOW_WIDTH,
@@ -56,6 +80,11 @@ class KlondikeGUI:
             FONT_SIZE,
             bold=FONT_BOLD,
         )
+        self.result_font = pygame.font.SysFont(
+            FONT_NAME,
+            RESULT_FONT_SIZE,
+            bold=True,
+        )
         self.suit_font = pygame.font.SysFont(
             SUIT_FONT_NAME,
             SUIT_FONT_SIZE,
@@ -70,9 +99,16 @@ class KlondikeGUI:
         self.game = KlondikeGame()
         self.game.start_new_game()
 
+        self.start_time = pygame.time.get_ticks()
+        self.elapsed_time = 0
+        self.timer_running = True
+
         self.running = True
 
         self.selected_source: tuple[MoveType, int, int | None] | None = None
+
+        self.feedback_rect: pygame.Rect | None = None
+        self.feedback_until = 0
 
     def run(self) -> None:
         """Run the main graphical loop."""
@@ -99,6 +135,43 @@ class KlondikeGUI:
     def _handle_left_click(self, position: tuple[int, int]) -> None:
         """Handle a left mouse button click."""
         x, y = position
+
+        undo_button_rect = pygame.Rect(
+            UNDO_BUTTON_X,
+            UNDO_BUTTON_Y,
+            UNDO_BUTTON_WIDTH,
+            UNDO_BUTTON_HEIGHT,
+        )
+
+        if undo_button_rect.collidepoint(position):
+            if self.game.undo():
+                self.selected_source = None
+                self.feedback_rect = None
+
+            return
+
+        new_game_button_rect = pygame.Rect(
+            NEW_GAME_BUTTON_X,
+            NEW_GAME_BUTTON_Y,
+            NEW_GAME_BUTTON_WIDTH,
+            NEW_GAME_BUTTON_HEIGHT,
+        )
+
+        if new_game_button_rect.collidepoint(position):
+            self.game.start_new_game()
+
+            self.start_time = pygame.time.get_ticks()
+            self.elapsed_time = 0
+            self.timer_running = True
+
+            self.selected_source = None
+            self.feedback_rect = None
+            self.feedback_until = 0
+            return
+
+        if self.game.is_won() or self.game.is_game_over():
+            self.selected_source = None
+            return
 
         stock_x = MARGIN_X
         stock_y = TOP_ROW_Y
@@ -164,7 +237,7 @@ class KlondikeGUI:
                         )
 
                         if source_type == MoveType.WASTE_TO_TABLEAU:
-                            self.game.execute_move(
+                            self._execute_move(
                                 Move(
                                     move_type=MoveType.WASTE_TO_FOUNDATION,
                                     target_index=index,
@@ -173,7 +246,7 @@ class KlondikeGUI:
                             self.selected_source = None
 
                         elif source_type == MoveType.TABLEAU_TO_TABLEAU:
-                            self.game.execute_move(
+                            self._execute_move(
                                 Move(
                                     move_type=MoveType.TABLEAU_TO_FOUNDATION,
                                     source_index=source_index,
@@ -226,7 +299,7 @@ class KlondikeGUI:
         source_type, source_index, card_index = self.selected_source
 
         if source_type == MoveType.FOUNDATION_TO_TABLEAU:
-            self.game.execute_move(
+            self._execute_move(
                 Move(
                     move_type=MoveType.FOUNDATION_TO_TABLEAU,
                     source_index=source_index,
@@ -235,7 +308,7 @@ class KlondikeGUI:
             )
 
         elif source_type == MoveType.WASTE_TO_TABLEAU:
-            self.game.execute_move(
+            self._execute_move(
                 Move(
                     move_type=MoveType.WASTE_TO_TABLEAU,
                     source_index=source_index,
@@ -245,7 +318,7 @@ class KlondikeGUI:
 
         elif source_type == MoveType.TABLEAU_TO_TABLEAU:
             if source_index != column:
-                self.game.execute_move(
+                self._execute_move(
                     Move(
                         move_type=MoveType.TABLEAU_TO_TABLEAU,
                         source_index=source_index,
@@ -257,12 +330,254 @@ class KlondikeGUI:
         self.selected_source = None
 
 
+    def _execute_move(self, move: Move) -> bool:
+        """Execute a move and highlight its destination if it fails."""
+        target_rect = self._get_move_target_rect(move)
+        success = self.game.execute_move(move)
+
+        if success:
+            self.feedback_rect = None
+        else:
+            self.feedback_rect = target_rect
+            self.feedback_until = (
+                pygame.time.get_ticks() + INVALID_MOVE_FEEDBACK_DURATION
+            )
+
+        return success
+
+    def _get_move_target_rect(self, move: Move) -> pygame.Rect:
+        """Get the rectangle of a move's destination."""
+        if move.move_type in (
+            MoveType.WASTE_TO_TABLEAU,
+            MoveType.FOUNDATION_TO_TABLEAU,
+            MoveType.TABLEAU_TO_TABLEAU,
+        ):
+            target_index = move.target_index
+            pile = self.game.tableau[target_index]
+
+            x = MARGIN_X + target_index * (CARD_WIDTH + COLUMN_GAP)
+
+            if pile.is_empty():
+                y = TABLEAU_Y
+            else:
+                y = TABLEAU_Y + (len(pile.cards) - 1) * TABLEAU_CARD_OFFSET
+
+        else:
+            target_index = move.target_index
+
+            foundation_start_x = (
+                WINDOW_WIDTH
+                - MARGIN_X
+                - (
+                    FOUNDATION_COUNT * CARD_WIDTH
+                    + (FOUNDATION_COUNT - 1) * CARD_SLOT_GAP
+                )
+            )
+
+            x = foundation_start_x + target_index * (
+                CARD_WIDTH + CARD_SLOT_GAP
+            )
+            y = TOP_ROW_Y
+
+        return pygame.Rect(x, y, CARD_WIDTH, CARD_HEIGHT)
+
+    def _get_elapsed_time(self) -> int:
+        """Return the elapsed game time in seconds."""
+        if self.timer_running:
+            current_time = pygame.time.get_ticks()
+            return (
+                self.elapsed_time
+                + current_time
+                - self.start_time
+            ) // 1000
+
+        return self.elapsed_time // 1000
+
+    def _draw_feedback(self) -> None:
+        """Draw a blinking red outline around an invalid move's destination."""
+        if self.feedback_rect is None:
+            return
+
+        current_time = pygame.time.get_ticks()
+
+        if current_time >= self.feedback_until:
+            self.feedback_rect = None
+            return
+
+        phase = (
+            current_time // INVALID_MOVE_BLINK_INTERVAL
+        ) % 2
+
+        if phase == 0:
+            pygame.draw.rect(
+                self.screen,
+                INVALID_MOVE_COLOR,
+                self.feedback_rect,
+                width=INVALID_MOVE_BORDER_WIDTH,
+                border_radius=CARD_CORNER_RADIUS,
+            )
+
+    def _draw_new_game_button(self) -> None:
+        """Draw the new game button."""
+        button_rect = pygame.Rect(
+            NEW_GAME_BUTTON_X,
+            NEW_GAME_BUTTON_Y,
+            NEW_GAME_BUTTON_WIDTH,
+            NEW_GAME_BUTTON_HEIGHT,
+        )
+
+        mouse_position = pygame.mouse.get_pos()
+
+        if button_rect.collidepoint(mouse_position):
+            button_color = NEW_GAME_BUTTON_HOVER_COLOR
+        else:
+            button_color = NEW_GAME_BUTTON_COLOR
+
+        pygame.draw.rect(
+            self.screen,
+            button_color,
+            button_rect,
+            border_radius=5,
+        )
+
+        text_surface = self.rank_font.render(
+            "New Game",
+            True,
+            NEW_GAME_BUTTON_TEXT_COLOR,
+        )
+
+        text_rect = text_surface.get_rect(
+            center=button_rect.center,
+        )
+
+        self.screen.blit(text_surface, text_rect)
+
+    def _draw_undo_button(self) -> None:
+        """Draw the undo button."""
+        button_rect = pygame.Rect(
+            UNDO_BUTTON_X,
+            UNDO_BUTTON_Y,
+            UNDO_BUTTON_WIDTH,
+            UNDO_BUTTON_HEIGHT,
+        )
+
+        mouse_position = pygame.mouse.get_pos()
+        can_undo = bool(self.game.history)
+
+        if not can_undo:
+            button_color = UNDO_BUTTON_DISABLED_COLOR
+        elif button_rect.collidepoint(mouse_position):
+            button_color = UNDO_BUTTON_HOVER_COLOR
+        else:
+            button_color = UNDO_BUTTON_COLOR
+
+        pygame.draw.rect(
+            self.screen,
+            button_color,
+            button_rect,
+            border_radius=5,
+        )
+
+        text_surface = self.rank_font.render(
+            "Undo",
+            True,
+            UNDO_BUTTON_TEXT_COLOR,
+        )
+
+        text_rect = text_surface.get_rect(
+            center=button_rect.center,
+        )
+
+        self.screen.blit(text_surface, text_rect)
+
+    def _draw_result(self) -> None:
+        """Draw the game result when the game ends."""
+        if self.game.is_won():
+            message = "You Won!"
+        elif self.game.is_game_over():
+            message = "No More Moves!"
+        else:
+            return
+
+        panel = pygame.Surface(
+            (RESULT_PANEL_WIDTH, RESULT_PANEL_HEIGHT),
+            pygame.SRCALPHA,
+        )
+        panel.fill(RESULT_PANEL_COLOR)
+
+        panel_rect = panel.get_rect(
+            center=(WINDOW_WIDTH // 2, WINDOW_HEIGHT // 2)
+        )
+
+        self.screen.blit(panel, panel_rect)
+
+        text_surface = self.result_font.render(
+            message,
+            True,
+            RESULT_TEXT_COLOR,
+        )
+
+        text_rect = text_surface.get_rect(
+            center=panel_rect.center,
+        )
+
+        self.screen.blit(text_surface, text_rect)
+
+    def _draw_move_count(self) -> None:
+        """Draw the current move count."""
+        text_surface = self.rank_font.render(
+            f"Moves: {self.game.move_count}",
+            True,
+            CARD_COLOR,
+        )
+
+        text_rect = text_surface.get_rect(
+            center=(WINDOW_WIDTH // 2, TOP_ROW_Y - 15)
+        )
+
+        self.screen.blit(text_surface, text_rect)
+
+    def _draw_timer(self) -> None:
+        """Draw the elapsed game time."""
+        elapsed_seconds = self._get_elapsed_time()
+
+        minutes, seconds = divmod(elapsed_seconds, 60)
+
+        text_surface = self.rank_font.render(
+            f"Time: {minutes:02d}:{seconds:02d}",
+            True,
+            CARD_COLOR,
+        )
+
+        text_rect = text_surface.get_rect(
+            midright=(
+                WINDOW_WIDTH - MARGIN_X,
+                TOP_ROW_Y - 15,
+            )
+        )
+
+        self.screen.blit(text_surface, text_rect)
+
     def _draw(self) -> None:
         """Draw the current game state."""
         self.screen.fill(BACKGROUND_COLOR)
 
+        if self.timer_running and (
+            self.game.is_won() or self.game.is_game_over()
+        ):
+            self.elapsed_time += (
+                pygame.time.get_ticks() - self.start_time
+            )
+            self.timer_running = False
+
         self._draw_top_row()
+        self._draw_move_count()
+        self._draw_timer()
         self._draw_tableau()
+        self._draw_feedback()
+        self._draw_new_game_button()
+        self._draw_undo_button()
+        self._draw_result()
 
     def _draw_card_back(self, x: int, y: int) -> None:
         """Draw a face-down card."""

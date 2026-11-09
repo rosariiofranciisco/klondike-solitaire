@@ -17,7 +17,7 @@ from klondike.config import (
     WINDOW_WIDTH,
 )
 from klondike.gui import KlondikeGUI
-from klondike.move import MoveType
+from klondike.move import Move, MoveType
 
 
 @pytest.fixture
@@ -91,6 +91,86 @@ def test_click_waste_then_tableau_moves_card(gui):
     assert gui.game.waste.is_empty()
     assert gui.game.tableau[0].cards == [target_card, moving_card]
     assert gui.selected_source is None
+
+
+def test_click_waste_then_foundation_moves_card(gui):
+    gui.game.stock.cards.clear()
+    gui.game.waste.cards.clear()
+
+    for pile in gui.game.tableau:
+        pile.cards.clear()
+
+    for foundation in gui.game.foundations:
+        foundation.cards.clear()
+
+    moving_card = Card(Suit.HEARTS, Rank.ACE, face_up=True)
+    gui.game.waste.add(moving_card)
+
+    waste_x = MARGIN_X + CARD_WIDTH + CARD_SLOT_GAP + 10
+    card_y = TOP_ROW_Y + 10
+
+    foundation_start_x = (
+        WINDOW_WIDTH
+        - MARGIN_X
+        - (
+            FOUNDATION_COUNT * CARD_WIDTH
+            + (FOUNDATION_COUNT - 1) * CARD_SLOT_GAP
+        )
+    )
+
+    foundation_x = foundation_start_x + 10
+
+    gui._handle_left_click((waste_x, card_y))
+
+    assert gui.selected_source is not None
+    assert gui.selected_source[0] == MoveType.WASTE_TO_TABLEAU
+
+    gui._handle_left_click((foundation_x, card_y))
+
+    assert gui.game.waste.is_empty()
+    assert gui.game.foundations[0].cards == [moving_card]
+    assert gui.selected_source is None
+
+
+def test_click_tableau_then_foundation_moves_card(gui):
+    gui.game.stock.cards.clear()
+    gui.game.waste.cards.clear()
+
+    for pile in gui.game.tableau:
+        pile.cards.clear()
+
+    for foundation in gui.game.foundations:
+        foundation.cards.clear()
+
+    moving_card = Card(Suit.HEARTS, Rank.ACE, face_up=True)
+    gui.game.tableau[0].add(moving_card)
+
+    tableau_x = MARGIN_X + 10
+    tableau_y = TABLEAU_Y + 10
+
+    foundation_start_x = (
+        WINDOW_WIDTH
+        - MARGIN_X
+        - (
+            FOUNDATION_COUNT * CARD_WIDTH
+            + (FOUNDATION_COUNT - 1) * CARD_SLOT_GAP
+        )
+    )
+
+    foundation_x = foundation_start_x + 10
+    foundation_y = TOP_ROW_Y + 10
+
+    gui._handle_left_click((tableau_x, tableau_y))
+
+    assert gui.selected_source is not None
+    assert gui.selected_source[0] == MoveType.TABLEAU_TO_TABLEAU
+
+    gui._handle_left_click((foundation_x, foundation_y))
+
+    assert gui.game.tableau[0].is_empty()
+    assert gui.game.foundations[0].cards == [moving_card]
+    assert gui.selected_source is None
+
 
 def test_click_tableau_moves_card_and_reveals_source_top(gui):
     gui.game.stock.cards.clear()
@@ -259,3 +339,102 @@ def test_click_selected_tableau_card_cancels_selection(gui):
     assert gui.selected_source is None
     assert gui.game.tableau[0].cards == [selected_card]
 
+
+def test_invalid_move_displays_feedback(gui):
+    gui.game.stock.cards.clear()
+    gui.game.waste.cards.clear()
+
+    for pile in gui.game.tableau:
+        pile.cards.clear()
+
+    target_card = Card(Suit.CLUBS, Rank.SEVEN, face_up=True)
+    moving_card = Card(Suit.CLUBS, Rank.SIX, face_up=True)
+
+    gui.game.tableau[0].add(target_card)
+    gui.game.waste.add(moving_card)
+
+    waste_x = MARGIN_X + CARD_WIDTH + CARD_SLOT_GAP + 10
+    card_y = TOP_ROW_Y + 10
+
+    tableau_x = MARGIN_X + 10
+    tableau_y = TABLEAU_Y + 10
+
+    gui._handle_left_click((waste_x, card_y))
+    gui._handle_left_click((tableau_x, tableau_y))
+
+    assert gui.game.waste.cards == [moving_card]
+    assert gui.game.tableau[0].cards == [target_card]
+    assert gui.feedback_rect is not None
+    assert gui.feedback_until > 0
+    assert gui.selected_source is None
+
+def test_draw_feedback_draws_red_outline(gui, monkeypatch):
+    gui.feedback_rect = pygame.Rect(100, 100, CARD_WIDTH, CARD_HEIGHT)
+    gui.feedback_until = 1000
+
+    drawn_rects = []
+
+    def fake_draw_rect(surface, color, rect, width=0, border_radius=0):
+        drawn_rects.append((color, rect, width, border_radius))
+
+    monkeypatch.setattr(pygame.time, "get_ticks", lambda: 100)
+    monkeypatch.setattr(pygame.draw, "rect", fake_draw_rect)
+
+    gui._draw_feedback()
+
+    assert len(drawn_rects) == 1
+    assert drawn_rects[0][0] == (220, 35, 45)
+    assert drawn_rects[0][1] == gui.feedback_rect
+    assert drawn_rects[0][2] == 3
+
+def test_draw_feedback_hides_outline_during_blink(gui, monkeypatch):
+    gui.feedback_rect = pygame.Rect(100, 100, CARD_WIDTH, CARD_HEIGHT)
+    gui.feedback_until = 1000
+
+    drawn_rects = []
+
+    def fake_draw_rect(surface, color, rect, width=0, border_radius=0):
+        drawn_rects.append(rect)
+
+    monkeypatch.setattr(pygame.time, "get_ticks", lambda: 150)
+    monkeypatch.setattr(pygame.draw, "rect", fake_draw_rect)
+
+    gui._draw_feedback()
+
+    assert drawn_rects == []
+    assert gui.feedback_rect is not None
+
+def test_successful_move_clears_feedback(gui):
+    gui.game.stock.cards.clear()
+    gui.game.waste.cards.clear()
+
+    ace = Card(Suit.HEARTS, Rank.ACE, face_up=True)
+    gui.game.waste.add(ace)
+
+    gui.feedback_rect = pygame.Rect(100, 100, CARD_WIDTH, CARD_HEIGHT)
+    gui.feedback_until = pygame.time.get_ticks() + 1000
+
+    move = Move(MoveType.WASTE_TO_FOUNDATION, target_index=0)
+
+    success = gui._execute_move(move)
+
+    assert success is True
+    assert gui.feedback_rect is None
+    assert ace in gui.game.foundations[0].cards
+
+def test_draw_result_displays_victory(gui, monkeypatch):
+    gui.screen.fill((0, 0, 0))
+
+    monkeypatch.setattr(gui.game, "is_won", lambda: True)
+    monkeypatch.setattr(gui.game, "is_game_over", lambda: True)
+
+    gui._draw_result()
+
+    panel_pixel = gui.screen.get_at(
+        (
+            (WINDOW_WIDTH - 400) // 2 + 1,
+            (WINDOW_HEIGHT - 120) // 2 + 1,
+        )
+    )
+
+    assert panel_pixel[:3] != (0, 0, 0)

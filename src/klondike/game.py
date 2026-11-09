@@ -60,6 +60,17 @@ class KlondikeGame:
 
     def start_new_game(self) -> None:
         """Create and deal a new Klondike game."""
+
+        for pile in self.tableau:
+            pile.cards.clear()
+
+        for pile in self.foundations:
+            pile.cards.clear()
+
+        self.stock.cards.clear()
+        self.waste.cards.clear()
+        self.history.clear()
+
         deck = Deck()
         deck.shuffle()
 
@@ -322,6 +333,11 @@ class KlondikeGame:
         tableau.add(foundation.remove())
 
         return True       
+
+    @property
+    def move_count(self) -> int:
+        """Return the number of moves made in the current game."""
+        return len(self.history)
 
     def is_won(self) -> bool:
         """Return whether all cards have been moved to the foundations."""
