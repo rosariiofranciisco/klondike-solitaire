@@ -107,6 +107,10 @@ class KlondikeGUI:
 
         self.selected_source: tuple[MoveType, int, int | None] | None = None
 
+        self.dragging = False
+        self.drag_position: tuple[int, int] | None = None
+        self.drag_offset: tuple[int, int] = (0, 0)
+
         self.feedback_rect: pygame.Rect | None = None
         self.feedback_until = 0
 
@@ -131,6 +135,20 @@ class KlondikeGUI:
                 if event.button == 1:
                     self._handle_left_click(event.pos)
 
+            elif event.type == pygame.MOUSEMOTION:
+                if self.selected_source is not None and event.buttons[0]:
+                    if self.drag_position is not None:
+                        dx = event.pos[0] - self.drag_position[0]
+                        dy = event.pos[1] - self.drag_position[1]
+
+                        if dx * dx + dy * dy > 25:
+                            self.dragging = True
+
+                    self.drag_position = event.pos
+
+            elif event.type == pygame.MOUSEBUTTONUP:
+                if event.button == 1 and self.dragging:
+                    self._handle_drop(event.pos)
 
     def _handle_left_click(self, position: tuple[int, int]) -> None:
         """Handle a left mouse button click."""
@@ -146,6 +164,8 @@ class KlondikeGUI:
         if undo_button_rect.collidepoint(position):
             if self.game.undo():
                 self.selected_source = None
+                self.dragging = False
+                self.drag_position = None
                 self.feedback_rect = None
 
             return
@@ -165,6 +185,8 @@ class KlondikeGUI:
             self.timer_running = True
 
             self.selected_source = None
+            self.dragging = False
+            self.drag_position = None
             self.feedback_rect = None
             self.feedback_until = 0
             return
@@ -200,10 +222,9 @@ class KlondikeGUI:
             and stock_y <= y <= stock_y + CARD_HEIGHT
         ):
             if not self.game.waste.is_empty():
-                self.selected_source = (
-                    MoveType.WASTE_TO_TABLEAU,
-                    0,
-                    None,
+                self._start_drag(
+                    (MoveType.WASTE_TO_TABLEAU, 0, None),
+                    position,
                 )
             return
 
@@ -226,10 +247,9 @@ class KlondikeGUI:
                 if foundation_x <= x <= foundation_x + CARD_WIDTH:
                     if self.selected_source is None:
                         if not foundation.is_empty():
-                            self.selected_source = (
-                                MoveType.FOUNDATION_TO_TABLEAU,
-                                index,
-                                None,
+                            self._start_drag(
+                                (MoveType.FOUNDATION_TO_TABLEAU, index, None),
+                                position,
                             )
                     else:
                         source_type, source_index, card_index = (
@@ -287,10 +307,9 @@ class KlondikeGUI:
 
                 if card_y <= y <= card_y + CARD_HEIGHT:
                     if pile.cards[card_index].face_up:
-                        self.selected_source = (
-                            MoveType.TABLEAU_TO_TABLEAU,
-                            column,
-                            card_index,
+                        self._start_drag(
+                            (MoveType.TABLEAU_TO_TABLEAU, column, card_index),
+                            position,
                         )
                         return
 
@@ -329,6 +348,136 @@ class KlondikeGUI:
 
         self.selected_source = None
 
+    def _start_drag(
+        self,
+        source: tuple[MoveType, int, int | None],
+        position: tuple[int, int],
+    ) -> None:
+        """Start dragging a card or sequence of cards."""
+        source_type, source_index, card_index = source
+
+        if source_type == MoveType.TABLEAU_TO_TABLEAU:
+            card_x = MARGIN_X + source_index * (
+                CARD_WIDTH + COLUMN_GAP
+            )
+            card_y = TABLEAU_Y + card_index * TABLEAU_CARD_OFFSET
+
+        elif source_type == MoveType.WASTE_TO_TABLEAU:
+            card_x = MARGIN_X + CARD_WIDTH + CARD_SLOT_GAP
+            card_y = TOP_ROW_Y
+
+        else:
+            foundation_start_x = (
+                WINDOW_WIDTH
+                - MARGIN_X
+                - (
+                    FOUNDATION_COUNT * CARD_WIDTH
+                    + (FOUNDATION_COUNT - 1) * CARD_SLOT_GAP
+                )
+            )
+
+            card_x = foundation_start_x + source_index * (
+                CARD_WIDTH + CARD_SLOT_GAP
+            )
+            card_y = TOP_ROW_Y
+
+        self.drag_offset = (
+            position[0] - card_x,
+            position[1] - card_y,
+        )
+
+        self.selected_source = source
+        self.dragging = False
+        self.drag_position = position
+
+    def _handle_drop(self, position: tuple[int, int]) -> None:
+        """Handle dropping a dragged card or sequence."""
+        if self.selected_source is None:
+            self.dragging = False
+            self.drag_position = None
+            return
+        source_type, source_index, card_index = self.selected_source
+        x, y = position
+
+        if TOP_ROW_Y <= y <= TOP_ROW_Y + CARD_HEIGHT:
+            foundation_start_x = (
+                WINDOW_WIDTH
+                - MARGIN_X
+                - (
+                    FOUNDATION_COUNT * CARD_WIDTH
+                    + (FOUNDATION_COUNT - 1) * CARD_SLOT_GAP
+                )
+            )
+
+            for index in range(FOUNDATION_COUNT):
+                foundation_x = foundation_start_x + index * (
+                    CARD_WIDTH + CARD_SLOT_GAP
+                )
+
+                if foundation_x <= x <= foundation_x + CARD_WIDTH:
+                    if source_type == MoveType.WASTE_TO_TABLEAU:
+                        self._execute_move(
+                            Move(
+                                MoveType.WASTE_TO_FOUNDATION,
+                                target_index=index,
+                            )
+                        )
+
+                    elif source_type == MoveType.TABLEAU_TO_TABLEAU:
+                        self._execute_move(
+                            Move(
+                                MoveType.TABLEAU_TO_FOUNDATION,
+                                source_index=source_index,
+                                target_index=index,
+                            )
+                        )
+
+                    break
+
+        elif y >= TABLEAU_Y:
+            column_width = CARD_WIDTH + COLUMN_GAP
+            column = (x - MARGIN_X) // column_width
+
+            if (
+                0 <= column < len(self.game.tableau)
+                and MARGIN_X + column * column_width
+                <= x
+                <= MARGIN_X + column * column_width + CARD_WIDTH
+            ):
+                if source_type == MoveType.FOUNDATION_TO_TABLEAU:
+                    self._execute_move(
+                        Move(
+                            MoveType.FOUNDATION_TO_TABLEAU,
+                            source_index=source_index,
+                            target_index=column,
+                        )
+                    )
+
+                elif source_type == MoveType.WASTE_TO_TABLEAU:
+                    self._execute_move(
+                        Move(
+                            MoveType.WASTE_TO_TABLEAU,
+                            source_index=source_index,
+                            target_index=column,
+                        )
+                    )
+
+                elif (
+                    source_type == MoveType.TABLEAU_TO_TABLEAU
+                    and source_index != column
+                ):
+                    self._execute_move(
+                        Move(
+                            MoveType.TABLEAU_TO_TABLEAU,
+                            source_index=source_index,
+                            card_index=card_index,
+                            target_index=column,
+                        )
+                    )
+
+        self.selected_source = None
+        self.dragging = False
+        self.drag_position = None
 
     def _execute_move(self, move: Move) -> bool:
         """Execute a move and highlight its destination if it fails."""
@@ -558,6 +707,32 @@ class KlondikeGUI:
 
         self.screen.blit(text_surface, text_rect)
 
+    def _draw_dragged_cards(self) -> None:
+        """Draw the dragged card or sequence at the mouse position."""
+        if not self.dragging or self.drag_position is None:
+            return
+
+        source_type, source_index, card_index = self.selected_source
+
+        x = self.drag_position[0] - self.drag_offset[0]
+        y = self.drag_position[1] - self.drag_offset[1]
+
+        if source_type == MoveType.TABLEAU_TO_TABLEAU:
+            cards = self.game.tableau[source_index].cards[card_index:]
+
+        elif source_type == MoveType.WASTE_TO_TABLEAU:
+            cards = [self.game.waste.peek()]
+
+        else:
+            cards = [self.game.foundations[source_index].peek()]
+
+        for index, card in enumerate(cards):
+            self._draw_card(
+                card,
+                x,
+                y + index * TABLEAU_CARD_OFFSET,
+            )
+
     def _draw(self) -> None:
         """Draw the current game state."""
         self.screen.fill(BACKGROUND_COLOR)
@@ -577,6 +752,7 @@ class KlondikeGUI:
         self._draw_feedback()
         self._draw_new_game_button()
         self._draw_undo_button()
+        self._draw_dragged_cards()
         self._draw_result()
 
     def _draw_card_back(self, x: int, y: int) -> None:
@@ -669,11 +845,18 @@ class KlondikeGUI:
             self._draw_card_back(stock_x, TOP_ROW_Y)
 
         if not self.game.waste.is_empty():
-            self._draw_card(
-                self.game.waste.peek(),
-                waste_x,
-                TOP_ROW_Y,
+            is_dragged = (
+                self.dragging
+                and self.selected_source is not None
+                and self.selected_source[0] == MoveType.WASTE_TO_TABLEAU
             )
+
+            if not is_dragged:
+                self._draw_card(
+                    self.game.waste.peek(),
+                    waste_x,
+                    TOP_ROW_Y,
+                )
         else:
             pygame.draw.rect(
                 self.screen,
@@ -686,6 +869,7 @@ class KlondikeGUI:
         if (
             self.selected_source is not None
             and self.selected_source[0] == MoveType.WASTE_TO_TABLEAU
+            and not self.dragging
         ):
             self._draw_selection(waste_x, TOP_ROW_Y)
 
@@ -714,17 +898,26 @@ class KlondikeGUI:
                     border_radius=CARD_CORNER_RADIUS,
                 )
             else:
-                self._draw_card(
-                    foundation.peek(),
-                    x,
-                    TOP_ROW_Y,
+                is_dragged = (
+                    self.dragging
+                    and self.selected_source is not None
+                    and self.selected_source[0] == MoveType.FOUNDATION_TO_TABLEAU
+                    and self.selected_source[1] == foundation_index
                 )
+
+                if not is_dragged:
+                    self._draw_card(
+                        foundation.peek(),
+                        x,
+                        TOP_ROW_Y,
+                    )
 
             if (
                 self.selected_source is not None
                 and self.selected_source[0]
                 == MoveType.FOUNDATION_TO_TABLEAU
                 and self.selected_source[1] == foundation_index
+                and not self.dragging
             ):
                 self._draw_selection(x, TOP_ROW_Y)
 
@@ -748,16 +941,26 @@ class KlondikeGUI:
             for card_index, card in enumerate(pile.cards):
                 y = TABLEAU_Y + card_index * TABLEAU_CARD_OFFSET
 
-                if card.face_up:
-                    self._draw_card(card, x, y)
-                else:
-                    self._draw_card_back(x, y)
+                is_dragged = (
+                    self.dragging
+                    and self.selected_source is not None
+                    and self.selected_source[0] == MoveType.TABLEAU_TO_TABLEAU
+                    and self.selected_source[1] == tableau_index
+                    and card_index >= self.selected_source[2]
+                )
+
+                if not is_dragged:
+                    if card.face_up:
+                        self._draw_card(card, x, y)
+                    else:
+                        self._draw_card_back(x, y)
 
                 if (
                     self.selected_source is not None
                     and self.selected_source[0] == MoveType.TABLEAU_TO_TABLEAU
                     and self.selected_source[1] == tableau_index
                     and self.selected_source[2] == card_index
+                    and not self.dragging
                 ):
                     self._draw_selection(x, y)
 
