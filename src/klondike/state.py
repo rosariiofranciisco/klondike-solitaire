@@ -13,3 +13,4 @@ class GameState:
     foundations: list[list[Card]]
     stock: list[Card]
     waste: list[Card]
+    score: int = 0

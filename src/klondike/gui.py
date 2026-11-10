@@ -672,6 +672,23 @@ class KlondikeGUI:
 
         self.screen.blit(text_surface, text_rect)
 
+    def _draw_score(self) -> None:
+        """Draw the current score."""
+        text_surface = self.rank_font.render(
+            f"Score: {self.game.score}",
+            True,
+            CARD_COLOR,
+        )
+
+        text_rect = text_surface.get_rect(
+            midleft=(
+                MARGIN_X,
+                TOP_ROW_Y - 15,
+            )
+        )
+
+        self.screen.blit(text_surface, text_rect)
+
     def _draw_move_count(self) -> None:
         """Draw the current move count."""
         text_surface = self.rank_font.render(
@@ -746,6 +763,7 @@ class KlondikeGUI:
             self.timer_running = False
 
         self._draw_top_row()
+        self._draw_score()
         self._draw_move_count()
         self._draw_timer()
         self._draw_tableau()

@@ -24,6 +24,7 @@ class KlondikeGame:
         ]
         self.stock = StockPile()
         self.waste = WastePile()
+        self.score = 0
         self.history: list[GameState] = []
 
     def _create_snapshot(self) -> GameState:
@@ -37,6 +38,7 @@ class KlondikeGame:
             ),
             stock=deepcopy(self.stock.cards),
             waste=deepcopy(self.waste.cards),
+            score=self.score,
         )
 
     def _restore_snapshot(self, state: GameState) -> None:
@@ -57,6 +59,7 @@ class KlondikeGame:
 
         self.stock.cards = deepcopy(state.stock)
         self.waste.cards = deepcopy(state.waste)
+        self.score = state.score
 
     def start_new_game(self) -> None:
         """Create and deal a new Klondike game."""
@@ -69,6 +72,7 @@ class KlondikeGame:
 
         self.stock.cards.clear()
         self.waste.cards.clear()
+        self.score = 0
         self.history.clear()
 
         deck = Deck()
@@ -450,6 +454,33 @@ class KlondikeGame:
             return False
 
         if result:
+            points = 0
+
+            if move.move_type == MoveType.WASTE_TO_TABLEAU:
+                points += 5
+
+            elif move.move_type in (
+                MoveType.WASTE_TO_FOUNDATION,
+                MoveType.TABLEAU_TO_FOUNDATION,
+            ):
+                points += 10
+
+            elif move.move_type == MoveType.FOUNDATION_TO_TABLEAU:
+                points -= 15
+
+            if move.move_type == MoveType.TABLEAU_TO_FOUNDATION:
+                if len(snapshot.tableau[move.source_index]) >= 2:
+                    if not snapshot.tableau[move.source_index][-2].face_up:
+                        points += 5
+
+            elif move.move_type == MoveType.TABLEAU_TO_TABLEAU:
+                if move.card_index > 0:
+                    if not snapshot.tableau[move.source_index][
+                        move.card_index - 1
+                    ].face_up:
+                        points += 5
+
+            self.score += points
             self.history.append(snapshot)
 
         return result
