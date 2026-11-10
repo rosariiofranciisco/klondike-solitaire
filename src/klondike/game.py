@@ -25,6 +25,9 @@ class KlondikeGame:
         self.stock = StockPile()
         self.waste = WastePile()
         self.score = 0
+        self.draw_count = 1
+        self.max_recycles: int | None = None
+        self.recycle_count = 0
         self.history: list[GameState] = []
 
     def _create_snapshot(self) -> GameState:
@@ -39,6 +42,7 @@ class KlondikeGame:
             stock=deepcopy(self.stock.cards),
             waste=deepcopy(self.waste.cards),
             score=self.score,
+            recycle_count=self.recycle_count,
         )
 
     def _restore_snapshot(self, state: GameState) -> None:
@@ -60,6 +64,7 @@ class KlondikeGame:
         self.stock.cards = deepcopy(state.stock)
         self.waste.cards = deepcopy(state.waste)
         self.score = state.score
+        self.recycle_count = state.recycle_count
 
     def start_new_game(self) -> None:
         """Create and deal a new Klondike game."""
@@ -73,6 +78,7 @@ class KlondikeGame:
         self.stock.cards.clear()
         self.waste.cards.clear()
         self.score = 0
+        self.recycle_count = 0
         self.history.clear()
 
         deck = Deck()
@@ -90,22 +96,34 @@ class KlondikeGame:
         self.history.clear()
 
     def draw_from_stock(self) -> bool:
-        """Move one card from the stock to the waste if possible."""
+        """Move cards from the stock to the waste according to draw_count."""
         if self.stock.is_empty():
             return False
 
-        card = self.stock.remove()
-        card.face_up = True
-        self.waste.add(card)
+        for _ in range(self.draw_count):
+            if self.stock.is_empty():
+                break
+
+            card = self.stock.remove()
+            card.face_up = True
+            self.waste.add(card)
 
         return True
 
-    def recycle_waste_to_stock(self) -> None:
-        """Move all waste cards back to the stock."""
+    def recycle_waste_to_stock(self) -> bool:
+        """Move all waste cards back to the stock if recycling is allowed."""
+        if self.max_recycles is not None:
+            if self.recycle_count >= self.max_recycles:
+                return False
+
         while not self.waste.is_empty():
             card = self.waste.remove()
             card.face_up = False
             self.stock.add(card)
+
+        self.recycle_count += 1
+
+        return True
 
     def can_move_waste_to_foundation(self, foundation_index: int) -> bool:
         """Return whether the top waste card can move to a foundation."""
@@ -356,7 +374,11 @@ class KlondikeGame:
             return False
 
         if not self.waste.is_empty():
-            return False
+            if (
+                self.max_recycles is None
+                or self.recycle_count < self.max_recycles
+            ):
+                return False
 
         for tableau_index in range(len(self.tableau)):
             for foundation_index in range(len(self.foundations)):
@@ -397,8 +419,7 @@ class KlondikeGame:
 
         elif move.move_type == MoveType.RECYCLE_WASTE_TO_STOCK:
             if self.stock.is_empty() and not self.waste.is_empty():
-                self.recycle_waste_to_stock()
-                result = True
+                result = self.recycle_waste_to_stock()
             else:
                 result = False
 

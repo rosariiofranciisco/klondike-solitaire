@@ -38,6 +38,29 @@ from klondike.config import (
     NEW_GAME_BUTTON_WIDTH,
     NEW_GAME_BUTTON_X,
     NEW_GAME_BUTTON_Y,
+    OPTIONS_BUTTON_HEIGHT,
+    OPTIONS_BUTTON_WIDTH,
+    OPTIONS_BUTTON_X,
+    OPTIONS_BUTTON_Y,
+    OPTIONS_CHOICE_BUTTON_COLOR,
+    OPTIONS_CHOICE_BUTTON_GAP,
+    OPTIONS_CHOICE_BUTTON_HEIGHT,
+    OPTIONS_CHOICE_BUTTON_HOVER_COLOR,
+    OPTIONS_CHOICE_BUTTON_LABEL_GAP,
+    OPTIONS_CHOICE_BUTTON_SELECTED_COLOR,
+    OPTIONS_CHOICE_BUTTON_TEXT_COLOR,
+    OPTIONS_CHOICE_BUTTON_WIDTH,
+    OPTIONS_DRAW_MODE_Y_OFFSET,
+    OPTIONS_PANEL_BORDER_COLOR,
+    OPTIONS_PANEL_BORDER_WIDTH,
+    OPTIONS_PANEL_COLOR,
+    OPTIONS_PANEL_CORNER_RADIUS,
+    OPTIONS_PANEL_HEIGHT,
+    OPTIONS_PANEL_TITLE_COLOR,
+    OPTIONS_PANEL_TITLE_Y_OFFSET,
+    OPTIONS_PANEL_WIDTH,
+    OPTIONS_RECYCLES_Y_OFFSET,
+    OPTIONS_SECTION_LABEL_COLOR,
     RANK_LABELS,
     RED_CARD_COLOR,
     RED_SUITS,
@@ -107,6 +130,8 @@ class KlondikeGUI:
 
         self.selected_source: tuple[MoveType, int, int | None] | None = None
 
+        self.options_open = False
+
         self.dragging = False
         self.drag_position: tuple[int, int] | None = None
         self.drag_offset: tuple[int, int] = (0, 0)
@@ -154,6 +179,21 @@ class KlondikeGUI:
         """Handle a left mouse button click."""
         x, y = position
 
+        if self.options_open:
+            options_rect = pygame.Rect(
+                OPTIONS_BUTTON_X,
+                OPTIONS_BUTTON_Y,
+                OPTIONS_BUTTON_WIDTH,
+                OPTIONS_BUTTON_HEIGHT,
+            )
+
+            if options_rect.collidepoint(position):
+                self.options_open = False
+                return
+
+            self._handle_options_click(position)
+            return
+
         undo_button_rect = pygame.Rect(
             UNDO_BUTTON_X,
             UNDO_BUTTON_Y,
@@ -191,6 +231,18 @@ class KlondikeGUI:
             self.feedback_until = 0
             return
 
+        options_rect = pygame.Rect(
+            OPTIONS_BUTTON_X,
+            OPTIONS_BUTTON_Y,
+            OPTIONS_BUTTON_WIDTH,
+            OPTIONS_BUTTON_HEIGHT,
+        )
+
+        if options_rect.collidepoint(position):
+            self.options_open = not self.options_open
+            self.selected_source = None
+            return
+
         if self.game.is_won() or self.game.is_game_over():
             self.selected_source = None
             return
@@ -198,6 +250,7 @@ class KlondikeGUI:
         stock_x = MARGIN_X
         stock_y = TOP_ROW_Y
         waste_x = MARGIN_X + CARD_WIDTH + CARD_SLOT_GAP
+        waste_visible_offset = max(0, min(len(self.game.waste), 3) - 1) * 15
 
 
         if (
@@ -218,7 +271,7 @@ class KlondikeGUI:
 
 
         if (
-            waste_x <= x <= waste_x + CARD_WIDTH
+            waste_x <= x <= waste_x + CARD_WIDTH + waste_visible_offset
             and stock_y <= y <= stock_y + CARD_HEIGHT
         ):
             if not self.game.waste.is_empty():
@@ -363,7 +416,12 @@ class KlondikeGUI:
             card_y = TABLEAU_Y + card_index * TABLEAU_CARD_OFFSET
 
         elif source_type == MoveType.WASTE_TO_TABLEAU:
-            card_x = MARGIN_X + CARD_WIDTH + CARD_SLOT_GAP
+            card_x = (
+                MARGIN_X
+                + CARD_WIDTH
+                + CARD_SLOT_GAP
+                + (min(len(self.game.waste), 3) - 1) * 15
+            )
             card_y = TOP_ROW_Y
 
         else:
@@ -601,6 +659,282 @@ class KlondikeGUI:
 
         self.screen.blit(text_surface, text_rect)
 
+    def _draw_options_button(self) -> None:
+        """Draw the Options button."""
+        button_rect = pygame.Rect(
+            OPTIONS_BUTTON_X,
+            OPTIONS_BUTTON_Y,
+            OPTIONS_BUTTON_WIDTH,
+            OPTIONS_BUTTON_HEIGHT,
+        )
+
+        mouse_position = pygame.mouse.get_pos()
+        color = (
+            NEW_GAME_BUTTON_HOVER_COLOR
+            if button_rect.collidepoint(mouse_position)
+            else NEW_GAME_BUTTON_COLOR
+        )
+
+        pygame.draw.rect(
+            self.screen,
+            color,
+            button_rect,
+            border_radius=8,
+        )
+
+        text = self.rank_font.render(
+            "Options",
+            True,
+            NEW_GAME_BUTTON_TEXT_COLOR,
+        )
+
+        text_rect = text.get_rect(center=button_rect.center)
+        self.screen.blit(text, text_rect)
+
+    def _draw_option_button(
+        self,
+        text: str,
+        x: int,
+        y: int,
+        selected: bool,
+    ) -> None:
+        """Draw an option button."""
+        button_rect = pygame.Rect(
+            x,
+            y,
+            OPTIONS_CHOICE_BUTTON_WIDTH,
+            OPTIONS_CHOICE_BUTTON_HEIGHT,
+        )
+
+        mouse_position = pygame.mouse.get_pos()
+
+        if selected:
+            color = OPTIONS_CHOICE_BUTTON_SELECTED_COLOR
+        elif button_rect.collidepoint(mouse_position):
+            color = OPTIONS_CHOICE_BUTTON_HOVER_COLOR
+        else:
+            color = OPTIONS_CHOICE_BUTTON_COLOR
+
+        pygame.draw.rect(
+            self.screen,
+            color,
+            button_rect,
+            border_radius=6,
+        )
+
+        label = self.rank_font.render(
+            text,
+            True,
+            OPTIONS_CHOICE_BUTTON_TEXT_COLOR,
+        )
+
+        label_rect = label.get_rect(center=button_rect.center)
+        self.screen.blit(label, label_rect)
+
+    def _handle_options_click(self, position: tuple[int, int]) -> bool:
+        """Handle clicks on the options panel."""
+        panel_rect = pygame.Rect(
+            (WINDOW_WIDTH - OPTIONS_PANEL_WIDTH) // 2,
+            (WINDOW_HEIGHT - OPTIONS_PANEL_HEIGHT) // 2,
+            OPTIONS_PANEL_WIDTH,
+            OPTIONS_PANEL_HEIGHT,
+        )
+
+        if not panel_rect.collidepoint(position):
+            return True
+
+        draw_button_y = (
+            panel_rect.top
+            + OPTIONS_DRAW_MODE_Y_OFFSET
+            + OPTIONS_CHOICE_BUTTON_LABEL_GAP
+        )
+
+        recycles_button_y = (
+            panel_rect.top
+            + OPTIONS_RECYCLES_Y_OFFSET
+            + OPTIONS_CHOICE_BUTTON_LABEL_GAP
+        )
+
+        buttons_width = (
+            OPTIONS_CHOICE_BUTTON_WIDTH * 2
+            + OPTIONS_CHOICE_BUTTON_GAP
+        )
+
+        button_start_x = (WINDOW_WIDTH - buttons_width) // 2
+
+        draw_1_rect = pygame.Rect(
+            button_start_x,
+            draw_button_y,
+            OPTIONS_CHOICE_BUTTON_WIDTH,
+            OPTIONS_CHOICE_BUTTON_HEIGHT,
+        )
+
+        draw_3_rect = pygame.Rect(
+            button_start_x + OPTIONS_CHOICE_BUTTON_WIDTH + OPTIONS_CHOICE_BUTTON_GAP,
+            draw_button_y,
+            OPTIONS_CHOICE_BUTTON_WIDTH,
+            OPTIONS_CHOICE_BUTTON_HEIGHT,
+        )
+
+        unlimited_rect = pygame.Rect(
+            button_start_x,
+            recycles_button_y,
+            OPTIONS_CHOICE_BUTTON_WIDTH,
+            OPTIONS_CHOICE_BUTTON_HEIGHT,
+        )
+
+        passes_rect = pygame.Rect(
+            button_start_x + OPTIONS_CHOICE_BUTTON_WIDTH + OPTIONS_CHOICE_BUTTON_GAP,
+            recycles_button_y,
+            OPTIONS_CHOICE_BUTTON_WIDTH,
+            OPTIONS_CHOICE_BUTTON_HEIGHT,
+        )
+
+        if draw_1_rect.collidepoint(position):
+            self.game.draw_count = 1
+
+        elif draw_3_rect.collidepoint(position):
+            self.game.draw_count = 3
+
+        elif unlimited_rect.collidepoint(position):
+            self.game.max_recycles = None
+
+        elif passes_rect.collidepoint(position):
+            self.game.max_recycles = 3
+
+        return True
+
+    def _draw_options_panel(self) -> None:
+        """Draw the game options panel."""
+        panel_rect = pygame.Rect(
+            (WINDOW_WIDTH - OPTIONS_PANEL_WIDTH) // 2,
+            (WINDOW_HEIGHT - OPTIONS_PANEL_HEIGHT) // 2,
+            OPTIONS_PANEL_WIDTH,
+            OPTIONS_PANEL_HEIGHT,
+        )
+
+        pygame.draw.rect(
+            self.screen,
+            OPTIONS_PANEL_COLOR,
+            panel_rect,
+            border_radius=OPTIONS_PANEL_CORNER_RADIUS,
+        )
+
+        pygame.draw.rect(
+            self.screen,
+            OPTIONS_PANEL_BORDER_COLOR,
+            panel_rect,
+            width=OPTIONS_PANEL_BORDER_WIDTH,
+            border_radius=OPTIONS_PANEL_CORNER_RADIUS,
+        )
+
+        title = self.rank_font.render(
+            "Game Options",
+            True,
+            OPTIONS_PANEL_TITLE_COLOR,
+        )
+
+        title_rect = title.get_rect(
+            center=(
+                WINDOW_WIDTH // 2,
+                panel_rect.top + OPTIONS_PANEL_TITLE_Y_OFFSET,
+            )
+        )
+
+        self.screen.blit(title, title_rect)
+
+        draw_mode_label = self.rank_font.render(
+            "Draw Mode",
+            True,
+            OPTIONS_SECTION_LABEL_COLOR,
+        )
+
+        draw_mode_rect = draw_mode_label.get_rect(
+            center=(
+                WINDOW_WIDTH // 2,
+                panel_rect.top + OPTIONS_DRAW_MODE_Y_OFFSET,
+            )
+        )
+
+        self.screen.blit(draw_mode_label, draw_mode_rect)
+
+        draw_button_y = (
+            panel_rect.top
+            + OPTIONS_DRAW_MODE_Y_OFFSET
+            + OPTIONS_CHOICE_BUTTON_LABEL_GAP
+        )
+
+        draw_buttons_width = (
+            OPTIONS_CHOICE_BUTTON_WIDTH * 2
+            + OPTIONS_CHOICE_BUTTON_GAP
+        )
+
+        draw_button_start_x = (
+            WINDOW_WIDTH - draw_buttons_width
+        ) // 2
+
+        self._draw_option_button(
+            "Draw 1",
+            draw_button_start_x,
+            draw_button_y,
+            self.game.draw_count == 1,
+        )
+
+        self._draw_option_button(
+            "Draw 3",
+            draw_button_start_x
+            + OPTIONS_CHOICE_BUTTON_WIDTH
+            + OPTIONS_CHOICE_BUTTON_GAP,
+            draw_button_y,
+            self.game.draw_count == 3,
+        )
+
+        recycles_button_y = (
+            panel_rect.top
+            + OPTIONS_RECYCLES_Y_OFFSET
+            + OPTIONS_CHOICE_BUTTON_LABEL_GAP
+        )
+
+        recycles_buttons_width = (
+            OPTIONS_CHOICE_BUTTON_WIDTH * 2
+            + OPTIONS_CHOICE_BUTTON_GAP
+        )
+
+        recycles_button_start_x = (
+            WINDOW_WIDTH - recycles_buttons_width
+        ) // 2
+
+        self._draw_option_button(
+            "Unlimited",
+            recycles_button_start_x,
+            recycles_button_y,
+            self.game.max_recycles is None,
+        )
+
+        self._draw_option_button(
+            "3 Passes",
+            recycles_button_start_x
+            + OPTIONS_CHOICE_BUTTON_WIDTH
+            + OPTIONS_CHOICE_BUTTON_GAP,
+            recycles_button_y,
+            self.game.max_recycles == 3,
+        )        
+
+        recycles_label = self.rank_font.render(
+            "Stock Recycles",
+            True,
+            OPTIONS_SECTION_LABEL_COLOR,
+        )
+
+        recycles_rect = recycles_label.get_rect(
+            center=(
+                WINDOW_WIDTH // 2,
+                panel_rect.top + OPTIONS_RECYCLES_Y_OFFSET,
+            )
+        )
+
+        self.screen.blit(recycles_label, recycles_rect)
+
     def _draw_undo_button(self) -> None:
         """Draw the undo button."""
         button_rect = pygame.Rect(
@@ -770,8 +1104,12 @@ class KlondikeGUI:
         self._draw_feedback()
         self._draw_new_game_button()
         self._draw_undo_button()
+        self._draw_options_button()
         self._draw_dragged_cards()
         self._draw_result()
+
+        if self.options_open:
+            self._draw_options_panel()
 
     def _draw_card_back(self, x: int, y: int) -> None:
         """Draw a face-down card."""
@@ -869,12 +1207,17 @@ class KlondikeGUI:
                 and self.selected_source[0] == MoveType.WASTE_TO_TABLEAU
             )
 
+            visible_cards = self.game.waste.cards[-3:]
+
             if not is_dragged:
-                self._draw_card(
-                    self.game.waste.peek(),
-                    waste_x,
-                    TOP_ROW_Y,
-                )
+                for index, card in enumerate(visible_cards):
+                    card_x = waste_x + index * 15
+
+                    self._draw_card(
+                        card,
+                        card_x,
+                        TOP_ROW_Y,
+                    )
         else:
             pygame.draw.rect(
                 self.screen,
@@ -889,7 +1232,10 @@ class KlondikeGUI:
             and self.selected_source[0] == MoveType.WASTE_TO_TABLEAU
             and not self.dragging
         ):
-            self._draw_selection(waste_x, TOP_ROW_Y)
+            selected_waste_x = (
+                waste_x + (min(len(self.game.waste), 3) - 1) * 15
+            )
+            self._draw_selection(selected_waste_x, TOP_ROW_Y)
 
         foundation_start_x = (
             WINDOW_WIDTH

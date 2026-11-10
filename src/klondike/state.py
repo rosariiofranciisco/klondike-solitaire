@@ -14,3 +14,4 @@ class GameState:
     stock: list[Card]
     waste: list[Card]
     score: int = 0
+    recycle_count: int = 0
