@@ -1,7 +1,9 @@
 """Pygame graphical interface for Klondike Solitaire."""
 
+
 import pygame
 
+from klondike.audio import GameAudio
 from klondike.config import (
     BACKGROUND_COLOR,
     BLACK_CARD_COLOR,
@@ -38,6 +40,18 @@ from klondike.config import (
     NEW_GAME_BUTTON_WIDTH,
     NEW_GAME_BUTTON_X,
     NEW_GAME_BUTTON_Y,
+    OPTIONS_AUDIO_FILL_COLOR,
+    OPTIONS_AUDIO_KNOB_COLOR,
+    OPTIONS_AUDIO_SLIDER_HEIGHT,
+    OPTIONS_AUDIO_SLIDER_KNOB_RADIUS,
+    OPTIONS_AUDIO_SLIDER_WIDTH,
+    OPTIONS_AUDIO_SLIDER_X_OFFSET,
+    OPTIONS_AUDIO_TEXT_COLOR,
+    OPTIONS_AUDIO_TITLE_Y_OFFSET,
+    OPTIONS_AUDIO_TOGGLE_HEIGHT,
+    OPTIONS_AUDIO_TOGGLE_WIDTH,
+    OPTIONS_AUDIO_TOGGLE_X_OFFSET,
+    OPTIONS_AUDIO_TRACK_COLOR,
     OPTIONS_BUTTON_HEIGHT,
     OPTIONS_BUTTON_WIDTH,
     OPTIONS_BUTTON_X,
@@ -51,6 +65,7 @@ from klondike.config import (
     OPTIONS_CHOICE_BUTTON_TEXT_COLOR,
     OPTIONS_CHOICE_BUTTON_WIDTH,
     OPTIONS_DRAW_MODE_Y_OFFSET,
+    OPTIONS_MUSIC_Y_OFFSET,
     OPTIONS_PANEL_BORDER_COLOR,
     OPTIONS_PANEL_BORDER_WIDTH,
     OPTIONS_PANEL_COLOR,
@@ -61,6 +76,7 @@ from klondike.config import (
     OPTIONS_PANEL_WIDTH,
     OPTIONS_RECYCLES_Y_OFFSET,
     OPTIONS_SECTION_LABEL_COLOR,
+    OPTIONS_SOUND_Y_OFFSET,
     RANK_LABELS,
     RED_CARD_COLOR,
     RED_SUITS,
@@ -98,6 +114,10 @@ class KlondikeGUI:
     def __init__(self) -> None:
         pygame.init()
 
+        self.audio = GameAudio()
+        self.audio.load_sounds()
+        self.audio.play_music()
+
         self.rank_font = pygame.font.SysFont(
             FONT_NAME,
             FONT_SIZE,
@@ -125,6 +145,7 @@ class KlondikeGUI:
         self.start_time = pygame.time.get_ticks()
         self.elapsed_time = 0
         self.timer_running = True
+        self.result_sound_played = False
 
         self.running = True
 
@@ -135,6 +156,7 @@ class KlondikeGUI:
         self.dragging = False
         self.drag_position: tuple[int, int] | None = None
         self.drag_offset: tuple[int, int] = (0, 0)
+        self.dragging_audio_slider: str | None = None
 
         self.feedback_rect: pygame.Rect | None = None
         self.feedback_until = 0
@@ -161,7 +183,10 @@ class KlondikeGUI:
                     self._handle_left_click(event.pos)
 
             elif event.type == pygame.MOUSEMOTION:
-                if self.selected_source is not None and event.buttons[0]:
+                if self.dragging_audio_slider is not None and event.buttons[0]:
+                    self._update_audio_slider(event.pos)
+
+                elif self.selected_source is not None and event.buttons[0]:
                     if self.drag_position is not None:
                         dx = event.pos[0] - self.drag_position[0]
                         dy = event.pos[1] - self.drag_position[1]
@@ -172,9 +197,13 @@ class KlondikeGUI:
                     self.drag_position = event.pos
 
             elif event.type == pygame.MOUSEBUTTONUP:
-                if event.button == 1 and self.dragging:
-                    self._handle_drop(event.pos)
+                if event.button == 1:
+                    if self.dragging_audio_slider is not None:
+                        self.dragging_audio_slider = None
 
+                    elif self.dragging:
+                        self._handle_drop(event.pos)
+    
     def _handle_left_click(self, position: tuple[int, int]) -> None:
         """Handle a left mouse button click."""
         x, y = position
@@ -202,6 +231,8 @@ class KlondikeGUI:
         )
 
         if undo_button_rect.collidepoint(position):
+            self.audio.play_sound("click")
+
             if self.game.undo():
                 self.selected_source = None
                 self.dragging = False
@@ -218,11 +249,13 @@ class KlondikeGUI:
         )
 
         if new_game_button_rect.collidepoint(position):
+            self.audio.play_sound("click")
             self.game.start_new_game()
 
             self.start_time = pygame.time.get_ticks()
             self.elapsed_time = 0
             self.timer_running = True
+            self.result_sound_played = False
 
             self.selected_source = None
             self.dragging = False
@@ -239,6 +272,7 @@ class KlondikeGUI:
         )
 
         if options_rect.collidepoint(position):
+            self.audio.play_sound("click")
             self.options_open = not self.options_open
             self.selected_source = None
             return
@@ -258,13 +292,17 @@ class KlondikeGUI:
             and stock_y <= y <= stock_y + CARD_HEIGHT
         ):
             if self.game.stock.is_empty():
-                self.game.execute_move(
+                success = self.game.execute_move(
                     Move(MoveType.RECYCLE_WASTE_TO_STOCK)
                 )
             else:
-                self.game.execute_move(
+                success = self.game.execute_move(
                     Move(MoveType.STOCK_TO_WASTE)
                 )
+
+            if success:
+                self.audio.play_sound("draw")
+                self._play_result_sound()
 
             self.selected_source = None
             return
@@ -537,12 +575,43 @@ class KlondikeGUI:
         self.dragging = False
         self.drag_position = None
 
+    def _play_result_sound(self) -> None:
+        """Play the appropriate sound when the game ends."""
+        if self.result_sound_played:
+            return
+
+        if self.game.is_won():
+            self.audio.play_sound("victory")
+            self.result_sound_played = True
+
+        elif self.game.is_game_over():
+            self.audio.play_sound("game_over")
+            self.result_sound_played = True
+
     def _execute_move(self, move: Move) -> bool:
         """Execute a move and highlight its destination if it fails."""
         target_rect = self._get_move_target_rect(move)
+        reveals_card = False
+
+        if move.move_type == MoveType.TABLEAU_TO_FOUNDATION:
+            source = self.game.tableau[move.source_index]
+
+            if len(source.cards) >= 2:
+                reveals_card = not source.cards[-2].face_up
+
+        elif move.move_type == MoveType.TABLEAU_TO_TABLEAU:
+            source = self.game.tableau[move.source_index]
+
+            if move.card_index > 0:
+                reveals_card = not source.cards[move.card_index - 1].face_up
+
         success = self.game.execute_move(move)
 
         if success:
+            self.audio.play_sound("move")
+            if reveals_card:
+                self.audio.play_sound("flip")
+            self._play_result_sound()
             self.feedback_rect = None
         else:
             self.feedback_rect = target_rect
@@ -731,6 +800,47 @@ class KlondikeGUI:
         label_rect = label.get_rect(center=button_rect.center)
         self.screen.blit(label, label_rect)
 
+    def _update_audio_slider(self, position: tuple[int, int]) -> None:
+        """Update the volume of the audio slider being dragged."""
+        panel_left = (WINDOW_WIDTH - OPTIONS_PANEL_WIDTH) // 2
+        panel_top = (WINDOW_HEIGHT - OPTIONS_PANEL_HEIGHT) // 2
+
+        if self.dragging_audio_slider == "music":
+            slider_x = panel_left + OPTIONS_AUDIO_SLIDER_X_OFFSET
+            slider_y = (
+                panel_top
+                + OPTIONS_MUSIC_Y_OFFSET
+                - OPTIONS_AUDIO_SLIDER_HEIGHT // 2
+            )
+
+            slider_rect = pygame.Rect(
+                slider_x,
+                slider_y,
+                OPTIONS_AUDIO_SLIDER_WIDTH,
+                OPTIONS_AUDIO_SLIDER_HEIGHT,
+            )
+
+            volume = (position[0] - slider_rect.left) / slider_rect.width
+            self.audio.set_music_volume(volume)
+
+        elif self.dragging_audio_slider == "sound":
+            slider_x = panel_left + OPTIONS_AUDIO_SLIDER_X_OFFSET
+            slider_y = (
+                panel_top
+                + OPTIONS_SOUND_Y_OFFSET
+                - OPTIONS_AUDIO_SLIDER_HEIGHT // 2
+            )
+
+            slider_rect = pygame.Rect(
+                slider_x,
+                slider_y,
+                OPTIONS_AUDIO_SLIDER_WIDTH,
+                OPTIONS_AUDIO_SLIDER_HEIGHT,
+            )
+
+            volume = (position[0] - slider_rect.left) / slider_rect.width
+            self.audio.set_sound_volume(volume)
+
     def _handle_options_click(self, position: tuple[int, int]) -> bool:
         """Handle clicks on the options panel."""
         panel_rect = pygame.Rect(
@@ -742,6 +852,56 @@ class KlondikeGUI:
 
         if not panel_rect.collidepoint(position):
             return True
+
+        music_y = panel_rect.top + OPTIONS_MUSIC_Y_OFFSET
+        sound_y = panel_rect.top + OPTIONS_SOUND_Y_OFFSET
+
+        music_slider_rect = pygame.Rect(
+            panel_rect.left + OPTIONS_AUDIO_SLIDER_X_OFFSET,
+            music_y - OPTIONS_AUDIO_SLIDER_HEIGHT // 2 - 8,
+            OPTIONS_AUDIO_SLIDER_WIDTH,
+            OPTIONS_AUDIO_SLIDER_HEIGHT + 16,
+        )
+
+        sound_slider_rect = pygame.Rect(
+            panel_rect.left + OPTIONS_AUDIO_SLIDER_X_OFFSET,
+            sound_y - OPTIONS_AUDIO_SLIDER_HEIGHT // 2 - 8,
+            OPTIONS_AUDIO_SLIDER_WIDTH,
+            OPTIONS_AUDIO_SLIDER_HEIGHT + 16,
+        )
+
+        if music_slider_rect.collidepoint(position):
+            self.dragging_audio_slider = "music"
+            self._update_audio_slider(position)
+            return True
+
+        if sound_slider_rect.collidepoint(position):
+            self.dragging_audio_slider = "sound"
+            self._update_audio_slider(position)
+            return True
+
+        music_y = panel_rect.top + OPTIONS_MUSIC_Y_OFFSET
+        sound_y = panel_rect.top + OPTIONS_SOUND_Y_OFFSET
+
+        music_toggle_rect = pygame.Rect(
+            panel_rect.left + OPTIONS_AUDIO_TOGGLE_X_OFFSET,
+            music_y - OPTIONS_AUDIO_TOGGLE_HEIGHT // 2,
+            OPTIONS_AUDIO_TOGGLE_WIDTH,
+            OPTIONS_AUDIO_TOGGLE_HEIGHT,
+        )
+
+        sound_toggle_rect = pygame.Rect(
+            panel_rect.left + OPTIONS_AUDIO_TOGGLE_X_OFFSET,
+            sound_y - OPTIONS_AUDIO_TOGGLE_HEIGHT // 2,
+            OPTIONS_AUDIO_TOGGLE_WIDTH,
+            OPTIONS_AUDIO_TOGGLE_HEIGHT,
+        )
+
+        if music_toggle_rect.collidepoint(position):
+            self.audio.toggle_music()
+
+        elif sound_toggle_rect.collidepoint(position):
+            self.audio.toggle_sound()
 
         draw_button_y = (
             panel_rect.top
@@ -803,6 +963,91 @@ class KlondikeGUI:
             self.game.max_recycles = 3
 
         return True
+
+    def _draw_audio_toggle(
+        self,
+        text: str,
+        x: int,
+        y: int,
+        enabled: bool,
+    ) -> None:
+        """Draw an audio on/off toggle button."""
+        button_rect = pygame.Rect(
+            x,
+            y,
+            OPTIONS_AUDIO_TOGGLE_WIDTH,
+            OPTIONS_AUDIO_TOGGLE_HEIGHT,
+        )
+
+        color = (
+            OPTIONS_CHOICE_BUTTON_SELECTED_COLOR
+            if enabled
+            else OPTIONS_CHOICE_BUTTON_COLOR
+        )
+
+        pygame.draw.rect(
+            self.screen,
+            color,
+            button_rect,
+            border_radius=5,
+        )
+
+        label = self.rank_font.render(
+            text,
+            True,
+            OPTIONS_AUDIO_TEXT_COLOR,
+        )
+
+        label_rect = label.get_rect(center=button_rect.center)
+        self.screen.blit(label, label_rect)
+
+    def _draw_audio_slider(
+        self,
+        x: int,
+        y: int,
+        volume: float,
+    ) -> None:
+        """Draw an audio volume slider."""
+        slider_rect = pygame.Rect(
+            x,
+            y,
+            OPTIONS_AUDIO_SLIDER_WIDTH,
+            OPTIONS_AUDIO_SLIDER_HEIGHT,
+        )
+
+        pygame.draw.rect(
+            self.screen,
+            OPTIONS_AUDIO_TRACK_COLOR,
+            slider_rect,
+            border_radius=5,
+        )
+
+        fill_width = int(
+            OPTIONS_AUDIO_SLIDER_WIDTH * volume
+        )
+
+        if fill_width > 0:
+            pygame.draw.rect(
+                self.screen,
+                OPTIONS_AUDIO_FILL_COLOR,
+                (
+                    x,
+                    y,
+                    fill_width,
+                    OPTIONS_AUDIO_SLIDER_HEIGHT,
+                ),
+                border_radius=5,
+            )
+
+        knob_x = x + fill_width
+        knob_y = y + OPTIONS_AUDIO_SLIDER_HEIGHT // 2
+
+        pygame.draw.circle(
+            self.screen,
+            OPTIONS_AUDIO_KNOB_COLOR,
+            (knob_x, knob_y),
+            OPTIONS_AUDIO_SLIDER_KNOB_RADIUS,
+        )
 
     def _draw_options_panel(self) -> None:
         """Draw the game options panel."""
@@ -934,6 +1179,74 @@ class KlondikeGUI:
         )
 
         self.screen.blit(recycles_label, recycles_rect)
+
+        audio_title = self.rank_font.render(
+            "Audio Settings",
+            True,
+            OPTIONS_SECTION_LABEL_COLOR,
+        )
+
+        audio_title_rect = audio_title.get_rect(
+            center=(
+                WINDOW_WIDTH // 2,
+                panel_rect.top + OPTIONS_AUDIO_TITLE_Y_OFFSET,
+            )
+        )
+
+        self.screen.blit(audio_title, audio_title_rect)
+
+        music_y = panel_rect.top + OPTIONS_MUSIC_Y_OFFSET
+        sound_y = panel_rect.top + OPTIONS_SOUND_Y_OFFSET
+
+        music_label = self.rank_font.render(
+            "Music",
+            True,
+            OPTIONS_AUDIO_TEXT_COLOR,
+        )
+
+        music_label_rect = music_label.get_rect(
+            midleft=(panel_rect.left + 25, music_y),
+        )
+
+        self.screen.blit(music_label, music_label_rect)
+
+        self._draw_audio_toggle(
+            "On" if self.audio.music_enabled else "Off",
+            panel_rect.left + OPTIONS_AUDIO_TOGGLE_X_OFFSET,
+            music_y - OPTIONS_AUDIO_TOGGLE_HEIGHT // 2,
+            self.audio.music_enabled,
+        )
+
+        self._draw_audio_slider(
+            panel_rect.left + OPTIONS_AUDIO_SLIDER_X_OFFSET,
+            music_y - OPTIONS_AUDIO_SLIDER_HEIGHT // 2,
+            self.audio.music_volume,
+        )
+
+        sound_label = self.rank_font.render(
+            "Sound FX",
+            True,
+            OPTIONS_AUDIO_TEXT_COLOR,
+        )
+
+        sound_label_rect = sound_label.get_rect(
+            midleft=(panel_rect.left + 25, sound_y),
+        )
+
+        self.screen.blit(sound_label, sound_label_rect)
+
+        self._draw_audio_toggle(
+            "On" if self.audio.sound_enabled else "Off",
+            panel_rect.left + OPTIONS_AUDIO_TOGGLE_X_OFFSET,
+            sound_y - OPTIONS_AUDIO_TOGGLE_HEIGHT // 2,
+            self.audio.sound_enabled,
+        )
+
+        self._draw_audio_slider(
+            panel_rect.left + OPTIONS_AUDIO_SLIDER_X_OFFSET,
+            sound_y - OPTIONS_AUDIO_SLIDER_HEIGHT // 2,
+            self.audio.sound_volume,
+        )
 
     def _draw_undo_button(self) -> None:
         """Draw the undo button."""
@@ -1209,15 +1522,21 @@ class KlondikeGUI:
 
             visible_cards = self.game.waste.cards[-3:]
 
-            if not is_dragged:
-                for index, card in enumerate(visible_cards):
-                    card_x = waste_x + index * 15
+            visible_cards = self.game.waste.cards[-3:]
 
-                    self._draw_card(
-                        card,
-                        card_x,
-                        TOP_ROW_Y,
-                    )
+            for index, card in enumerate(visible_cards):
+                is_top_card = index == len(visible_cards) - 1
+
+                if is_dragged and is_top_card:
+                    continue
+
+                card_x = waste_x + index * 15
+
+                self._draw_card(
+                    card,
+                    card_x,
+                    TOP_ROW_Y,
+                )
         else:
             pygame.draw.rect(
                 self.screen,
